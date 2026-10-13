@@ -1,0 +1,47 @@
+# Security boundaries
+
+This milestone provides an authenticated API foundation. It is not a completed production security review, hardware attestation service, or guarantee that authorized users cannot copy data they can view.
+
+## What stays on the server
+
+Discord's client secret and token exchange stay on the server. No Discord token is sent to the iPhone or stored in the database. The future inventory worker will keep DG cookies, refresh tokens, inventory requests, stock classification, and prediction logic on the server too. None of those inventory credentials are needed to run this first API milestone.
+
+The eventual Swift app needs the API base URL, its public app identifiers, an installation signing key, and its own session credentials. It must receive enough store data to display a map, so that returned data can still be observed or copied by an authorized user. Keeping the monitor off the phone protects its implementation and upstream credentials; it does not make screenshots, reverse engineering, or abuse of an authorized account impossible.
+
+## Implemented controls
+
+- Discord OAuth uses one-use expiring state and the `identify` scope. The native callback contains a two-minute handoff code, not an access token. Exchanging it requires the original S256 verifier and installation signature.
+- A numeric Discord ID allowlist is enforced at sign-in and on every authenticated request and refresh. Environment changes take effect when the process restarts. An empty allowlist denies everyone.
+- Requests are signed with an installation's P-256 key. The signature covers method, exact path/query, exact body, timestamp, nonce, and the access-token hash when present. Nonces persist across restarts.
+- One active installation and one active session are maintained per Discord ID. Explicit transfers revoke the preceding sessions immediately. The six-hour transfer deadline survives logout and restart.
+- Access tokens expire after at most 15 minutes; refresh tokens rotate inside a fixed 30-day session. Only SHA-256 token hashes are stored. Authenticated refresh-token reuse revokes the session.
+- Inbox reads and updates are constrained by the authenticated account, not a client-supplied user ID. The inbox is limited to seven days. Public stock data sharing will be a separate, intentional policy in the inventory milestone.
+- The API limits body size and request rates and returns sanitized errors. It does not log credentials, request bodies, or OAuth URLs. Rate-limit proxy headers are ignored unless explicitly trusted.
+- SQLite is stored outside the source tree on a persistent Railway volume in production. Production startup refuses an absent/mismatched configured mount. Transactions cover session changes, imports, and recovery invalidation.
+- Backups use SQLite's online backup API. Prepared restore copies invalidate existing sessions and challenge codes to avoid reviving old tokens.
+
+## One installation versus one physical iPhone
+
+The current server enforces **one registered signing key at a time**. It cannot yet prove that a key was created by the real Takeoff binary in real iPhone hardware. A malicious client with both an exportable private key and its session credentials could share that installation identity. A device ID string or obscured API key would not fix this.
+
+The Swift client should use a Secure Enclave key on a physical device and `ThisDeviceOnly` Keychain storage for local credentials. The later paid-developer milestone adds App Attest with server-verified challenges and assertions. Even that is abuse resistance, not an absolute defense against a compromised authorized device. Free Personal Team testing must not be represented as having full attestation.
+
+Device transfer enforcement does not depend on APNs. Push registration/revocation will be attached to the active installation when APNs is implemented. Until then, the backend explicitly reports that remote push is unavailable.
+
+## Existing public credentials
+
+The original repository contained captured DG credentials. Removing them from the current source does not revoke them, erase earlier commits, remove other people's clones, or remove cached copies. Before monitoring cutover, establish a fresh DG website session and replace the affected server credentials. Keep those values in Railway Variables. Rotate any other secret that was exposed; do not assume the webhook or a newly created Discord OAuth secret was exposed unless it actually was.
+
+A private repository protects future access. A clean private repository also avoids carrying the original credential-bearing Git history into the new project. Do not include `.git`, `.env`, cache files, SQLite databases, or backup files in a source download intended for sharing.
+
+## Operational limits
+
+This design uses one Node process and one local SQLite database. Its in-memory rate limits reset on restart; authentication state and revocations do not. Do not add replicas or separate workers sharing copies of this database. A future need for multiple machines calls for a shared database and distributed coordination.
+
+Back up before migrations, restrict infrastructure access, and retain a protected off-service copy. The database and backups are not encrypted by this application; storage-account controls and any platform encryption are separate responsibilities. Do not copy a lone live `.sqlite` file while ignoring its WAL. Never restore stale sessions directly from a raw backup.
+
+The authenticated profile and public key records persist until explicitly removed. Inbox history expires after seven days; audit events after 30 days; session token records after their session's expiry. Data export/account deletion and payment entitlement workflows belong to the later release preparation, not the present app controls.
+
+Infrastructure logging may capture request URLs even when this application does not. Redact OAuth callback query strings and Authorization headers and restrict log access. Never enable indiscriminate body or header logging to debug a real sign-in.
+
+Before admitting paying users, complete the live integration checks, evaluate request volume and provider backoff, verify backup recovery, and review the completed client and inventory API. The existing automated suite tests specific defenses; it does not prove the full eventual application is production ready.

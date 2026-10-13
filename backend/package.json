@@ -1,0 +1,15 @@
+{
+  "name": "takeoff-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Takeoff's private API and persistent account foundation",
+  "type": "module",
+  "engines": { "node": ">=24 <25" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/main.js",
+    "test": "node --test test/*.test.js",
+    "import-cache": "node --env-file-if-exists=.env scripts/import-cache.js",
+    "backup": "node --env-file-if-exists=.env scripts/backup.js",
+    "prepare-restore": "node scripts/prepare-restore.js"
+  }
+}
