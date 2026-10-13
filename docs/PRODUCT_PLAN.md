@@ -6,8 +6,8 @@ This plan records the decisions made before implementation. Features described h
 
 | Milestone | Deliverable | Acceptance target | Current state |
 | --- | --- | --- | --- |
-| 1. Backend foundation | Persistent storage, Discord allowlist, signed sessions, one installation, six-hour transfers, catalog/inbox API, backups | Automated auth/recovery checks pass; then real Railway/Discord check | Source prepared and locally tested; not deployed |
-| 2. First iPhone app | SwiftUI project, sign-in, ZIP/product settings, map/store details, favorites/exclusions, private/public notes, history/inbox; supporting inventory API | Run on the owner's iPhone against Railway; accurate unknown/freshness labels | Planned |
+| 1. Backend foundation | Persistent storage, Discord allowlist, signed sessions, one installation, six-hour transfers, catalog/inbox API, backups | Automated auth/recovery checks pass; then real Railway/Discord check | Backend delivered; owner reports Railway is set up |
+| 2. First iPhone app | SwiftUI project, sign-in, ZIP/product settings, map/store details, favorites/exclusions, private/public notes, history/inbox; supporting inventory API | Run on the owner's iPhone against Railway; accurate unknown/freshness labels | Source prepared; backend tested; Xcode build and live integration pending |
 | 3. Inventory intelligence | New-stock batch tracking, opening-hours timing, store averages, confidence, patterns, approaching-time events | Agreed threshold examples and store-hours cases pass; compare with live observations | Planned |
 | 4. Trips | Suggested stop order, editable routes, arrival warnings, Apple Maps handoff, trip-change handling | Device-tested road estimates and Maps handoff | Planned |
 | 5. Notifications and beta | APNs, device push revocation, App Attest, TestFlight preparation | Physical-device push/revocation and beta testing using paid membership | Planned |
@@ -20,7 +20,7 @@ Each user saves one US ZIP code with a fixed 25-mile radius. Resolve it to a cen
 
 The operator maintains approved UPCs and titles. Users choose any number of the listed products; they do not type arbitrary titles/UPCs into the app. The catalog begins with the active items in the current DG monitor. No announcements editor or admin dashboard is being built now.
 
-Monitor only areas and products supported by active users' selections. Reuse overlapping store/product observations and avoid duplicate polls. Members can browse already-covered areas, including coverage created by another member; their own alerts follow their ZIP/product settings. When coverage loses its final subscriber, stop its extra polling and mark old observations stale. Do not imply stale data is current stock.
+Monitor only areas and products supported by active users' selections. Deduplicate identical ZIP+UPC polls and share store/product snapshots across overlapping regions. Distinct ZIP centers still need their own area queries; unchanged observations do not create duplicate alerts. Members can browse already-covered areas, including coverage created by another member; their own alerts follow their ZIP/product settings. When coverage loses its final subscriber, stop its extra polling and mark old observations stale. Do not imply stale data is current stock.
 
 Retain the existing nominal polling cadence: every three minutes normally, every ten seconds for qualifying recently increased products for up to 72 hours while stock remains, with staggered work. Preserve timeout, error handling, and provider backoff. A provider error is never a zero-stock observation. Multi-area load and any upstream constraints need measurement before a broader rollout.
 

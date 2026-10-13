@@ -1,0 +1,11 @@
+{
+  "method": "PUT",
+  "target": "/v1/settings?example=%30",
+  "body": "{\"zip\":\"02108\",\"products\":[\"196214158801\"]}",
+  "timestamp": "1700000000",
+  "nonce": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+  "token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "messageBase64": "dGFrZW9mZi12MQpQVVQKL3YxL3NldHRpbmdzP2V4YW1wbGU9JTMwCmExNjZiMjVjMWFjMGI3MzBlMGRmMGUyM2Q0YWI5OWJkMThmZGU1NzhjNDAxNDdlMjc5NWU1OTQ2MDIxY2FiNWMKMTcwMDAwMDAwMApubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5uCjY2ZDM0ZmJhNzFmOGY0NTBmN2U0NTU5ODg1M2U1M2JmYzIzYmJkMTI5MDI3Y2JiMTMxYTJmNGZmZDc4NzhjZDA=",
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEqF04Oo9fFcSCdnUfad1B4T5DGj9A\nkdkl/DkasvA/X2OwBlMXCDfy3cZe3/c0IvJ3UysEvKTfaua3+eXeRu1jWg==\n-----END PUBLIC KEY-----\n",
+  "signatureBase64": "MEUCIQCBC9M/CUNBsRri21e+2x5zeE4zBV6mirvyArcxO0FdYQIgJuA0PiJA+rOUXvqAgfS/IPDBaDLYVaytXDz25L8Kfng="
+}

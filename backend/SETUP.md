@@ -1,12 +1,12 @@
 # Takeoff backend setup
 
-This is the first backend milestone. You can run its tests and health endpoints now. Real Discord sign-in requires your own Discord application settings; the native callback will become usable from the iPhone app in Milestone 2. There is no fake-login bypass in the running server.
+This guide covers a fresh backend deployment and recovery. If Railway is already set up from Milestone 1, use [the Milestone 2 upgrade guide](../docs/MILESTONE_2_UPGRADE.md), then [the Xcode guide](../docs/XCODE_TESTING.md). The native iPhone client is now included. There is no fake-login bypass in the running server.
 
 ## 1. Keep the source private
 
 Use a clean private GitHub repository for new development, or make the existing repository private before pushing this branch. A new private repository should receive only the current sanitized files, without the original `.git` directory, credentials, cache snapshots, or `node_modules`.
 
-The existing Railway monitor tracks `main`. Keep this backend on a separate service while testing. Do not replace the old service's start command with the new API: this API is not polling inventory yet.
+Keep the new API on its existing separate service while validating the cutover. Milestone 2 includes optional DG polling; see the upgrade guide for credentials, first subscriptions, and stopping the legacy monitor after validation.
 
 ## 2. Create the Discord sign-in application
 
@@ -96,9 +96,9 @@ Let Railway provide `PORT`, or set its domain target port to match an explicit `
 
 `TRUST_PROXY_HOPS=1` trusts Railway's documented `X-Real-IP` header when requests must pass through its edge. Keep the container reachable through that trusted path; do not expose an alternate direct public port. If another proxy is added, verify its header rewriting before changing this setting. The fallback for other explicitly configured proxy chains reads `X-Forwarded-For` from the trusted end. Local development defaults to `0`, ignoring both headers. With `0` behind Railway, users can share the proxy's IP rate-limit bucket. The per-account limit also remains active. See [Railway networking headers](https://docs.railway.com/networking/public-networking/specs-and-limits).
 
-Register the generated HTTPS callback URI in Discord, deploy this new service, and open `https://YOUR-BACKEND.up.railway.app/health/ready`. The logs should report that the backend foundation is listening and that monitoring and remote push are not connected yet.
+Register the generated HTTPS callback URI in Discord, deploy this new service, and open `https://YOUR-BACKEND.up.railway.app/health/ready`. The logs should report Takeoff API v0.2, the configured DG monitoring state, and that predictions/APNs are not enabled.
 
-Configure this service without sleeping/serverless behavior before attaching an always-on inventory worker in a later milestone. A mounted SQLite volume means this design is for one service replica; it is not a horizontally scaled database setup. This keeps the initial infrastructure small. Railway service and storage charges depend on your plan and usage; an always-on monitor is not promised to fit a free tier. Check the [current Railway plans](https://docs.railway.com/pricing/plans) before enabling paid resources.
+Configure this service without sleeping/serverless behavior when enabling its inventory worker. A mounted SQLite volume means this design is for one service replica; it is not a horizontally scaled database setup. This keeps the initial infrastructure small. Railway service and storage charges depend on your plan and usage; an always-on monitor is not promised to fit a free tier. Check the [current Railway plans](https://docs.railway.com/pricing/plans) before enabling paid resources.
 
 ## 5. Preserve the current monitor's state
 
@@ -112,7 +112,7 @@ To archive an exported cache into the new backend, copy it to a private location
 npm run import-cache -- /absolute/path/to/current-dg-stock-cache.json
 ```
 
-The import is transactional and refuses to overwrite an existing import. It archives old quantities and timing without asserting a current shelf status. Old elapsed-clock-time averages are **not** used as opening-hours averages. The inventory intelligence milestone will create new observations and train the new model.
+The import is transactional and refuses to overwrite an existing import. It archives old quantities and timing without asserting a current shelf status. Old elapsed-clock-time averages are **not** used as opening-hours averages. The Milestone 2 worker creates fresh observations; Milestone 3 will build opening-hours timing samples and forecasts.
 
 The legacy monitor has also been changed locally to read credentials from environment variables and write its cache atomically. Before deploying that revised legacy file, configure every required root `.env.example` credential with a fresh DG website session, attach a volume to that legacy service, set `DG_CACHE_FILE=/data/dg-stock-cache.json`, and place the verified exported cache there. A volume belongs to its service; do not assume the new API's volume also persists the old monitor's file. The old file still sends Discord notifications until the later app monitoring cutover.
 

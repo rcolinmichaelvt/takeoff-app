@@ -148,6 +148,9 @@ export class AuthService {
   }
 
   assertActive(session) {
+    // A caller may have waited on ZIP resolution after authenticating. Re-read
+    // revocation and the active installation instead of trusting that snapshot.
+    session = session?.id ? this.lookupSession(session.id) : undefined;
     requireCondition(session && session.revoked_at === null && session.expires_at > this.clock() &&
       session.key_id === session.active_key_id, 401, 'SESSION_REVOKED', 'Sign in again on the authorized device.');
     this.assertAllowed(session.discord_id);

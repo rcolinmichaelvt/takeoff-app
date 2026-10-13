@@ -1,59 +1,132 @@
-# Xcode, iPhone testing, and notifications
+# Run Takeoff on your iPhone with Xcode
 
-**There is no Xcode project in Milestone 1.** The current code is the server foundation. This guide records the signing and device setup for the SwiftUI project in Milestone 2; it is not asking you to create a blank replacement app now.
+Milestone 2 includes a real SwiftUI project at `ios/Takeoff.xcodeproj`. Open that project directly. The app targets **iPhone, iOS 17.0 or later**, uses Swift 5 language mode, and has no external Swift packages. Your reported iPhone on iOS 26.2 meets the deployment target. Xcode still needs the appropriate device support installed locally.
 
-Your reported setup is macOS Tahoe 26.3, Xcode 26.4.1, and an iPhone 17 running iOS 26.2. The first app should target iPhone and set its minimum iOS version no higher than 26.2 so it can run on that phone. The Mac/Xcode combination and installed device support still need to be checked in your local Xcode; this Linux workspace cannot compile an iOS app or verify those versions firsthand.
+The source and project structure were checked in a Linux workspace. **An Xcode build and on-device run have not been performed here.** The included four XCTest cases are ready to run on your Mac.
 
-## What the free account can do
+## 1. Upgrade your existing Railway backend first
 
-| Capability | Free Personal Team | Paid Apple Developer Program |
-| --- | --- | --- |
-| Build and install on your own iPhone from Xcode | Yes, with signing limits | Yes |
-| Sign in with Discord and use the Railway HTTPS API | Yes | Yes |
-| Fetch inventory/inbox while the app is open | Yes, after those features are implemented | Yes |
-| Fetch missed alerts when you reopen the app | Yes, after the client exists | Yes |
-| Schedule a local notification on the phone | Yes, with permission and app implementation | Yes |
-| Receive native APNs pushes from Railway | No | Yes, after APNs setup |
-| TestFlight distribution | No | Yes, after App Store Connect setup |
-| App Attest integration | Not available with the needed Personal Team capability | Available with supported devices and setup |
+Follow [MILESTONE_2_UPGRADE.md](MILESTONE_2_UPGRADE.md). Your existing Milestone 1 service needs the new settings, store, note, and inventory endpoints. Keep the same service URL and persistent `/data` volume.
 
-A local notification is scheduled by the phone based on information it already has. It can fire later, but it cannot learn about a new server-side stock change while the app is suspended. Keeping a network connection open, using background refresh, or scheduling a repeating task is not a reliable substitute for APNs.
+You can test Discord sign-in and save a ZIP before enabling DG monitoring. An empty map is expected until the worker has valid DG credentials and at least one member has saved a ZIP and selected products.
 
-Apple's free provisioning profiles expire after seven days, so expect to rebuild/reinstall periodically. The paid program is currently listed at US $99 annually, with regional pricing/taxes potentially differing. You can test real APNs in an Xcode-installed development build after enrolling; publishing to the App Store first is unnecessary. Local test notifications are not proof that server push is working.
+Confirm these existing Railway values:
 
-Sources: [Apple developer account limits](https://developer.apple.com/help/account/basics/about-your-developer-account), [supported iOS capabilities](https://developer.apple.com/help/account/reference/supported-capabilities-ios), [program membership](https://developer.apple.com/programs/), [local notification scheduling](https://developer.apple.com/documentation/usernotifications/scheduling-a-notification-locally-from-your-app).
+| Railway setting | Value |
+| --- | --- |
+| `PUBLIC_BASE_URL` | Your API's HTTPS origin, such as `https://takeoff-api-example.up.railway.app` |
+| `APP_CALLBACK_URL` | `takeoff://auth/callback` |
+| `ALLOWED_DISCORD_IDS` | Your numeric Discord user ID |
+| `MODERATOR_DISCORD_IDS` | Your ID too, if you want to test public notes |
 
-## Prepare Xcode and your iPhone
+In the Discord Developer Portal, the registered OAuth redirect is **your Railway URL plus `/v1/auth/discord/callback`**. The `takeoff://` URL is the second hop, from your backend into the app; it is already registered in the project's Info.plist.
 
-1. Open Xcode, finish its first-run component installation, then open **Xcode → Settings → Accounts** and add your Apple Account. It should show a Personal Team when you are not enrolled in the paid program.
-2. Connect and unlock the iPhone. Accept Trust This Computer when prompted. Open **Window → Devices and Simulators** in Xcode and confirm the phone is paired and available. Install the required platform/device support if Xcode requests it.
-3. On the iPhone, enable **Settings → Privacy & Security → Developer Mode**, restart, and confirm. This option may appear only after pairing with Xcode. See [Apple's Developer Mode instructions](https://developer.apple.com/documentation/xcode/enabling-developer-mode-on-a-device).
-4. When the Takeoff project is supplied, open its `.xcodeproj`, select the Takeoff app target, and choose **Signing & Capabilities**. Enable automatic signing, select your Personal Team, and use a unique bundle identifier such as `com.yourname.takeoff`.
-5. Keep the free-testing target free of paid-only entitlements such as Push Notifications and App Attest. The Discord callback scheme is `takeoff`; the project will register its URL type. This scheme is separate from the HTTPS callback registered in Discord.
-6. Set the app's environment configuration to the new Railway HTTPS API base URL. Only the base URL belongs in the app configuration; Discord's client secret and DG credentials stay in Railway.
-7. Select the physical iPhone as the run destination and use **Product → Run**. Follow any device trust instructions shown by Xcode/iOS. The phone must be online to authenticate and load server data.
+## 2. Open the project
 
-See [Apple's device run instructions](https://help.apple.com/xcode/mac/current/en.lproj/dev5a825a1ca.html). The project-specific filenames and build settings will be included with the actual Milestone 2 source; they do not exist yet in this delivery.
+1. Unzip the download into a normal folder on your Mac. Keep the `ios/Takeoff`, `ios/TakeoffTests`, and `ios/Takeoff.xcodeproj` items together.
+2. Open Xcode and finish any first-run component installation.
+3. Choose **File → Open**, select `ios/Takeoff.xcodeproj`, and open it. You can also double-click that file in Finder.
+4. In the left Project navigator, expand the **Takeoff** source group and open **AppConfiguration.swift**.
+5. Replace this one line with your real Railway origin:
 
-## First device checks when the client is ready
+   ```swift
+   static let apiBaseURL = "https://YOUR-BACKEND.up.railway.app"
+   ```
 
-- Start Discord sign-in inside Takeoff, accept the browser prompt, and return to the app. Verify your displayed Discord account and catalog.
-- Configure your one saved ZIP, select approved products, and compare the map with server observations. Early/unknown data must not be labeled ready for sale.
-- Close and reopen the app to check session restoration and the missed-alert inbox.
-- Test an explicit device transfer using a second installation. The first installation must lose API access; a further transfer must respect six hours.
-- Test after a Railway redeployment to verify that your preferences, sessions, and stock history remain on the volume once those features are connected.
+   Use `https://`, with no `/v1`, `/health`, or callback path. This is the **only server value** the app needs. DG cookies, DG authorization headers, and the Discord client secret stay in Railway Variables.
 
-The simulator is a separate installation from the physical phone. Treat changing between them as a device transfer for the same Discord account. A simulator cannot establish a real Secure Enclave/App Attest result. Use separate allowed test accounts if frequent transfers would interfere with development; do not disable the six-hour rule in production.
+## 3. Select your Apple account and signing team
 
-## Later: APNs and TestFlight
+1. Open **Xcode → Settings → Accounts** and add your Apple Account if it is not already listed.
+2. Click the blue **Takeoff** project icon at the top of the Project navigator.
+3. Under **TARGETS**, select **Takeoff** and open **Signing & Capabilities**.
+4. Keep **Automatically manage signing** checked.
+5. Choose your **Personal Team** in the Team menu.
+6. Replace `com.yourname.takeoff` with a unique bundle identifier, for example `com.colinmichael.takeoff.dev`. If Apple reports that it is already used, choose another unique identifier.
+7. If you run the tests on a physical device, also select **TakeoffTests**, choose the same Team, and set its bundle identifier to `com.colinmichael.takeoff.dev.tests` (matching your own chosen prefix).
 
-1. Enroll in the Apple Developer Program and select that paid team in Xcode. Confirm the intended bundle ID and ownership before creating the App Store Connect app record.
-2. Enable Push Notifications for the app identifier and target. Create an APNs authentication key and store the `.p8` private key, Key ID, Team ID, and bundle ID on the backend. Never include the `.p8` key in the app or repository.
-3. Implement notification permission requests, APNs device registration, server registration bound to the active session, delivery retries, invalid-token handling, and device-transfer revocation. Development builds use the appropriate development APNs environment; TestFlight uses production. Keep token/environment pairs distinct.
-4. Test actual server-originated changes on the physical iPhone, including background delivery, denied permissions, app reopening, old-device revocation, and missed events. Push delivery is best effort; the server inbox remains the record of missed alerts.
-5. Implement and verify App Attest separately. Turning on a capability alone does not implement server validation.
-6. Create the App Store Connect record, configure signing, select a device archive destination, and use **Product → Archive**. In Organizer, validate and distribute to App Store Connect. Complete the requested build/privacy/export information, then add TestFlight testers. External testing can require beta review.
+There are no Push Notifications, App Attest, or shared-Keychain entitlements in this local-testing target. Ordinary app Keychain storage, Secure Enclave signing, MapKit display, and Discord browser sign-in do not need a shared-Keychain capability. Keep the bundle identifier stable across normal rebuilds so the app retains its installation identity.
 
-TestFlight is for beta distribution. Payment access through Whop and final App Store release requirements will be designed later; no external-payment flow is being implemented or promised approval here. Recheck the applicable distribution and payment rules when that milestone starts.
+## 4. Connect and prepare your iPhone
 
-See [Apple's beta distribution guide](https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases) and [APNs token authentication](https://developer.apple.com/help/account/capabilities/communicate-with-apns-using-authentication-tokens).
+1. Connect your iPhone to the Mac, unlock it, and accept **Trust This Computer** if prompted.
+2. In Xcode, open **Window → Devices and Simulators**. Confirm your iPhone appears and allow pairing/device preparation to finish.
+3. Enable **Settings → Privacy & Security → Developer Mode** on the iPhone, restart when asked, then confirm Developer Mode. The setting may appear after you first pair with Xcode.
+4. In the run destination menu near Xcode's Run button, choose **your actual iPhone** and the **Takeoff** scheme. `Any iOS Device` is an archive/build destination, not your connected phone.
+5. Choose **Product → Run** or press **Command-R**. Follow any device trust prompts shown by Xcode/iOS. If iOS asks you to trust a developer profile, use **Settings → General → VPN & Device Management** for your own Apple account's profile.
+
+Xcode may ask to download an iOS platform component. Use the component it requests. If it explicitly says the phone OS is unsupported, update Xcode/device support to a compatible version. You do not need to raise the app's minimum iOS version to the SDK version.
+
+Official references: [running on a device](https://developer.apple.com/documentation/xcode/running-your-app-in-simulator-or-on-a-device), [Developer Mode](https://developer.apple.com/documentation/xcode/enabling-developer-mode-on-a-device).
+
+## 5. First run inside Takeoff
+
+1. Tap **Continue with Discord**, approve the browser prompt, and sign in using the account on your server allowlist.
+2. Enter one five-digit US ZIP, or tap **Use current location for ZIP**. Location fills the field once; press Save/Start to commit it. Traveling later will not move your monitoring area.
+3. Select your products from the curated catalog and tap **Start exploring**. Selecting no products creates no monitoring work for your account.
+4. Open **Discover**. Use the list/map toggle, item filter, and **Your 25 miles / All covered areas** control. The app refreshes approximately every 30 seconds while active; you can refresh manually.
+5. Tap a store. Check product quantities and observation times, favorite/exclude it, and save a private note. Moderators can separately save a public note. Drive estimates are requested on demand from your saved ZIP's center and can be unavailable.
+6. Open **Inbox** for changes selected by your alert preferences from the last seven days. In **Settings → Alerts & pause**, choose event types or pause notifications. Paused events remain in the inbox.
+
+A green pin means at least one filtered product is likely for sale; yellow means back stock when no filtered product is green; gray means uncertain data when neither green nor yellow applies; red means all observed filtered products are sold out. The store detail shows each observed product separately. Initial positive observations are gray until enough changes are observed. Observations older than nine minutes, or without an active subscription covering them, also show unknown.
+
+The server uses DG coordinates if supplied. Otherwise it resolves public store addresses using the US Census geocoder. This runs separately from stock polling. Some addresses may not resolve; those stores still appear in the list when their distance is known. Geocoded coordinates are labeled in details. Apple Maps opens the selected place; a multi-store trip planner belongs to Milestone 4.
+
+## 6. Run the included iOS checks
+
+Choose an installed **iPhone simulator** as the destination, keep the **Takeoff** scheme selected, then press **Command-U**. The four tests cover:
+
+- Exact request-signing bytes and verification of a Node-generated P-256 DER signature.
+- Callback origin/state validation and rejection of duplicate login codes.
+- Stale stock losing its sale claim while retaining the last observed quantity.
+- Partial preference updates omitting unrelated fields.
+
+These tests do not sign in or contact Railway. A simulator is a **different installation** if you later sign into it. Moving the same Discord account between your phone and a simulator invokes the six-hour transfer rule. The simulator uses a development-only software signing key; physical phones use Secure Enclave. For normal development, test the UI signed in on one installation at a time.
+
+## 7. What the free Personal Team can do
+
+| Capability | This local build with a free Personal Team |
+| --- | --- |
+| Install and run on your own iPhone | Yes, with Apple's free provisioning limits |
+| Discord sign-in and Railway HTTPS requests | Yes |
+| Refresh map/details while the app is open | Yes |
+| Retrieve missed alerts on reopening | Yes |
+| Native stock-change push while the app is closed | **No** |
+| TestFlight distribution | **No** |
+
+A real server-originated phone push requires the Apple Developer Program and the APNs work in Milestone 5. A local notification cannot discover a new server change while the app is suspended. This milestone does not add background polling or local reminder notifications.
+
+Free provisioning profiles expire after seven days; reconnect and run from Xcode again when necessary. Rebuilding with the same signing identity/bundle identifier is preferable to deleting the app. Keychain identity can survive reinstalling, so deletion is not a way to reset the server's cooldown.
+
+Sources: [Apple developer account overview](https://developer.apple.com/help/account/basics/about-your-developer-account), [membership comparison and Personal Team limits](https://developer.apple.com/support/compare-memberships/), [iOS capability availability](https://developer.apple.com/help/account/reference/supported-capabilities-ios).
+
+## Troubleshooting
+
+| What you see | What to check |
+| --- | --- |
+| `node: bad option: --test` on your Mac | Terminal is still using old Node. Install Node **24.x**, reopen Terminal, run `node --version` and `which node`, then run `npm test` from `backend`. Xcode does not run Node. |
+| Signing requires a development team | Select your Personal Team on the **Takeoff target**, not only the project. Check TakeoffTests too if running tests on the phone. |
+| Bundle identifier unavailable | Choose a unique bundle identifier and let automatic signing refresh. |
+| Project opens but no files/build target appear | Open the supplied `.xcodeproj`; preserve the sibling source/test directories. Avoid dragging duplicate copies into a blank project. |
+| “Set your Railway HTTPS URL” | Replace the placeholder in `Takeoff/AppConfiguration.swift`, then build again. |
+| Server response does not match this app / endpoint missing | Deploy all Milestone 2 backend files to the API service, then retry. A healthy Milestone 1 API still lacks the new endpoints. |
+| Discord invalid redirect | Match the exact HTTPS callback in Discord to Railway's `PUBLIC_BASE_URL`. |
+| Discord access denied | Check the numeric user ID and the signed-in Discord account; apply the Railway allowlist change. |
+| Invalid or expired sign-in code | Restart sign-in and complete the device-transfer prompt within two minutes. |
+| Device transfer cooldown | Keep using the currently authorized installation, or wait for the stated deadline. Reinstalling/signing out does not remove it. |
+| Request signature/time error | Turn on automatic date and time on the phone and confirm the backend clock. |
+| Map remains empty | Check selected products, saved ZIP, `DG_MONITOR_ENABLED`, server credentials, and the monitor status in Settings. `/health/ready` checks database access, not live DG inventory. |
+| Pins missing but stores appear in the list | Store coordinates may still be resolving or no unambiguous address match was found. |
+| Gray stock | Early monitoring, lost coverage, or no successful fresh check. This is intentionally different from sold out. |
+| Driving estimate unavailable | Keep using the stock/list information and try later. Network, Maps availability, signing environment, or missing coordinates can prevent estimates. |
+| No phone notification while closed | Expected with this milestone/Personal Team. Read the inbox on reopening; APNs comes in Milestone 5. |
+
+For build errors, copy the **first red compiler error and its file/line** from Xcode's Issue navigator (Command-5). Do not include credentials or full HTTP authorization logs.
+
+## Later: TestFlight
+
+After enrolling in the Apple Developer Program, Milestone 5 will connect APNs registration/delivery to the authorized installation, add server-validated App Attest, and prepare an App Store Connect app record. Real APNs can be tested on an Xcode-installed development build before TestFlight. TestFlight builds use the production APNs environment. Distribution also needs privacy/account-deletion/review preparation; a capability checkbox alone does not implement these features.
+
+Use the paid Team, finalize the bundle ID, choose a device archive destination, and **Product → Archive → Organizer → Distribute App → App Store Connect** once that milestone is ready. Complete the required build information and add TestFlight testers; external testing may require beta review. Whop/payment entitlement integration remains deferred.
+
+See [Apple's beta distribution guide](https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases).

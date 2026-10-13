@@ -5,6 +5,8 @@ import { AppError, requireCondition } from './errors.js';
 import { AuthService } from './auth.js';
 import { RateLimiter } from './rate-limit.js';
 import { loadCatalog } from './catalog.js';
+import { createGeography } from './geography.js';
+import { AppData } from './app-data.js';
 
 const BODY_LIMIT = 16 * 1024;
 
@@ -47,8 +49,9 @@ function send(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
-export function createServer({ config, db, discord, clock = Date.now, logger = console, catalog = loadCatalog() }) {
+export function createServer({ config, db, discord, clock = Date.now, logger = console, catalog = loadCatalog(), geography = createGeography({ db, clock }) }) {
   const auth = new AuthService({ config, db, discord, clock });
+  const appData = new AppData({ config, db, catalog, geography, clock });
   const limiter = new RateLimiter(clock);
   const server = http.createServer(async (req, res) => {
     const requestId = randomUUID();
@@ -108,10 +111,33 @@ export function createServer({ config, db, discord, clock = Date.now, logger = c
         return send(res, 200, { discordId: session.discord_id, displayName: session.display_name,
           role: config.moderatorIds.has(session.discord_id) ? 'moderator' : 'member',
           deviceName: session.device_name, nextDeviceTransferAt: new Date(session.next_transfer_at).toISOString(),
-          capabilities: { monitoring: false, remotePush: false, appAttestRequired: false },
+          capabilities: { monitoring: config.monitor.enabled, inventory: true, predictions: false, remotePush: false, appAttestRequired: false },
         });
       }
       if (method === 'GET' && route === '/v1/catalog') return send(res, 200, { products: catalog });
+      if (method === 'GET' && route === '/v1/settings') return send(res, 200, appData.settings(session.discord_id));
+      if (method === 'PUT' && route === '/v1/settings') {
+        limiter.take(`settings:${session.discord_id}`, 20, 60_000);
+        const result = await appData.saveSettings(session.discord_id, data, () => auth.assertActive(session));
+        return send(res, 200, result);
+      }
+      if (method === 'GET' && route === '/v1/monitor/status') return send(res, 200, appData.monitoringStatus());
+      if (method === 'GET' && route === '/v1/stores') {
+        requireCondition([...url.searchParams.keys()].every(k => ['scope', 'after', 'limit', 'favorites'].includes(k)),
+          400, 'INVALID_INPUT', 'Invalid store filter.');
+        return send(res, 200, appData.stores(session.discord_id, Object.fromEntries(url.searchParams)));
+      }
+      const storeRoute = route.match(/^\/v1\/stores\/(\d{1,12})(?:\/(preferences|public-note|history))?$/);
+      if (storeRoute) {
+        const [, id, action] = storeRoute;
+        if (method === 'GET' && !action) return send(res, 200, appData.store(session.discord_id, id));
+        if (method === 'PUT' && action === 'preferences') return send(res, 200, appData.saveStorePreferences(session.discord_id, id, data));
+        if (method === 'PUT' && action === 'public-note') return send(res, 200, appData.savePublicNote(session.discord_id, id, data));
+        if (method === 'GET' && action === 'history') {
+          requireCondition([...url.searchParams.keys()].every(k => ['before', 'limit'].includes(k)), 400, 'INVALID_INPUT', 'Invalid history filter.');
+          return send(res, 200, appData.history(id, Object.fromEntries(url.searchParams)));
+        }
+      }
       if (method === 'POST' && route === '/v1/auth/logout') {
         auth.logout(session);
         return send(res, 200, { signedOut: true });
@@ -158,5 +184,5 @@ export function createServer({ config, db, discord, clock = Date.now, logger = c
   server.headersTimeout = 10_000;
   server.keepAliveTimeout = 5000;
   server.maxRequestsPerSocket = 500;
-  return { server, auth };
+  return { server, auth, appData, geography };
 }

@@ -1,35 +1,47 @@
 # Takeoff
 
-Takeoff is being migrated from the existing Dollar General Discord monitor into a private backend and a SwiftUI iPhone app.
+A private Dollar General monitoring backend and a SwiftUI iPhone app.
 
-**This delivery is Milestone 1: the backend foundation.** It includes persistent accounts and sessions, Discord sign-in, an ID allowlist, signed installation requests, device transfers with a six-hour cooldown, the curated product catalog, a seven-day alert inbox API, and backup/migration tools. The automated tests use temporary databases and fake Discord responses.
+**Milestone 2 source is ready for local iPhone testing.** It includes the Xcode project, Discord sign-in, a saved ZIP and curated product selections, map/list views, store details, favorites/exclusions, private and moderator notes, a seven-day history/inbox, and the supporting server worker/API.
 
-The new backend does **not yet poll Dollar General, generate inventory alerts, send APNs notifications, or include an Xcode project**. The existing monitor remains a separate program. Nothing in this delivery has been deployed to your live Railway service.
+The backend polls only subscribed ZIP/product pairs, keeps DG credentials and classification on the server, and preserves data on the existing Railway volume. Basic shelf inference follows the agreed old-stock/new-stock threshold. The physical iPhone client uses a Secure Enclave signing key and device-only Keychain session storage.
+
+**Restock predictions, multi-store trips, APNs, App Attest, TestFlight distribution, and payments are later milestones.** This build refreshes while open and retrieves missed alerts on reopening. It does not send phone push notifications.
 
 ## Start here
 
-- [Local and Railway setup](backend/SETUP.md)
-- [API and native sign-in contract](backend/API.md)
-- [Security boundaries and credentials](backend/SECURITY.md)
-- [Approved requirements and milestones](docs/PRODUCT_PLAN.md)
-- [Xcode, Personal Team, notifications, and TestFlight](docs/XCODE_TESTING.md)
-- [Validation and remaining checks](docs/VALIDATION.md)
+1. [Upgrade your existing Railway service](docs/MILESTONE_2_UPGRADE.md).
+2. [Open the project and run it in Xcode](docs/XCODE_TESTING.md).
+3. Set the HTTPS URL in `ios/Takeoff/AppConfiguration.swift`, choose your Personal Team/bundle ID, and run the **Takeoff** scheme on your iPhone.
 
-## Run the tests
+Open **`ios/Takeoff.xcodeproj`** directly. There is no blank-project setup or package installation step for the app.
 
-Install Node.js **24.x**, then run these from the repository root:
+## Included source
+
+| Folder | Purpose |
+| --- | --- |
+| `backend/` | Node 24 API, Discord access, persistent SQLite data, DG worker, curated catalog, tests and deployment files |
+| `ios/` | SwiftUI app, Xcode project, assets, request-signing/callback XCTest cases |
+| `docs/` | Railway upgrade, Xcode guide, agreed milestones and validation notes |
+
+Install **Node.js 24.x** and run the backend checks:
 
 ```sh
 cd backend
+node --version
 npm test
 ```
 
-The backend has no third-party runtime dependencies and does not need the root `node_modules` directory. Its SQLite database is created at runtime, not during the build.
+No third-party backend runtime dependencies are required. If Node says `bad option: --test`, the Terminal is still using an old Node installation; fix that version before continuing. Xcode uses Swift and does not need Node to compile the app.
 
-## Repository and deployment safety
+## References and validation
 
-The original GitHub repository was public when this work was prepared. Its history contains captured Dollar General session credentials. This version reads those values from server environment variables and excludes live caches, databases, and `.env` files from new commits. That does not remove credentials from earlier commits or undo prior exposure. Obtain fresh credentials before the monitoring migration.
+- [API contract](backend/API.md)
+- [Fresh backend setup and recovery](backend/SETUP.md)
+- [Security boundaries](backend/SECURITY.md)
+- [Approved milestones](docs/PRODUCT_PLAN.md)
+- [Validation and remaining device checks](docs/VALIDATION.md)
 
-Keep new server work in a **private repository**. A clean private repository avoids copying the original credential-bearing Git history. The original repository's visibility and existing Railway service have not been changed.
+The Node tests, migration, API integration checks, project graph, plist/scheme parsing, and Swift syntax parsing were checked locally. Xcode/iPhone compilation, a real Discord browser login, and this worker's live DG session still require your Mac/device/deployment check. This download has not been pushed or deployed to your running service.
 
-`dgMonitor.js` is still the legacy Discord monitor. The local changes to it remove embedded credentials and support a persistent cache path. Deploying that revised file requires the root `.env.example` variables and a persistent volume first. The new backend instead uses `backend/.env.example` and its own volume. See the migration instructions before changing the existing service.
+Keep the app's source in a private repository. The original monitor's public Git history contained session credentials; use fresh DG values in Railway and transfer sanitized files without that old Git history. The root `dgMonitor.js` remains the separate legacy Discord monitor. After validating the app worker, stop the old monitor as described in the upgrade guide.

@@ -4,7 +4,7 @@ The base URL is the private service's public HTTPS origin. Authentication contro
 
 ## Native sign-in sequence
 
-1. Create a P-256 signing key for this installation. In the iPhone implementation, use a Secure Enclave key when available and device-only Keychain protection. Retain it across ordinary sign-outs. Send only its SPKI PEM public key to the backend. Do not put a shared secret in the app.
+1. Create a P-256 signing key for this installation. The supplied iPhone implementation uses a Secure Enclave key on physical hardware and device-only Keychain protection; its simulator build uses a development software key. Retain it across ordinary sign-outs. Send only its SPKI PEM public key to the backend. Do not put a shared secret in the app.
 2. Generate a cryptographically random 32-byte verifier, encoded as unpadded base64url. Compute `base64url(SHA256(UTF8(verifier)))`. Retain the verifier only for this login attempt.
 3. `POST /v1/auth/discord/start` with:
 
@@ -21,7 +21,7 @@ The base URL is the private service's public HTTPS origin. Authentication contro
 4. Discord redirects to the **server** at `/v1/auth/discord/callback`. The server consumes its one-use state, exchanges Discord's authorization code, requests the `identify` profile, and enforces the allowlist. It never sends the Discord client secret or Discord access token to the app.
 5. The server redirects back to `takeoff://auth/callback?state=...&login_code=...`. Validate the exact callback scheme, host, path, and the original state before accepting it. Cancellation/denial returns `error=access_denied`; an expected upstream failure returns `error=discord_unavailable`. An invalid/expired server state is rejected without an app redirect.
 6. Send a **signed** `POST /v1/auth/exchange` with `loginCode`, `codeVerifier`, and `transferExistingDevice: false`. The handoff code expires in two minutes and is single-use. It requires both the original verifier and a signature from the original installation key. The S256 protection here covers the Takeoff server-to-app handoff; it does not assume Discord implements a particular native PKCE flow.
-7. Store the returned refresh token with device-only Keychain protection. Keep access tokens in memory where practical. Neither token, the verifier, nor the private key belongs in `UserDefaults`, crash reports, URLs, analytics, or logs.
+7. Store the returned token pair atomically with device-only Keychain protection. The supplied client restores the pair on launch and rotates it as a unit. Neither token, the verifier, nor the private key belongs in `UserDefaults`, crash reports, URLs, analytics, or logs.
 
 A successful exchange returns `accessToken`, `refreshToken`, `tokenType: "Bearer"`, `expiresIn`, `sessionExpiresAt`, `serverTime`, `user`, and `deviceTransferred`. Access tokens last at most 15 minutes. The session has a fixed 30-day maximum; refreshing does not extend that deadline. A new login replaces the previous session even on the same installation.
 
@@ -51,7 +51,7 @@ lowercase_hex_sha256_of_access_token_or_a_single_dash
 
 For exchange and refresh, the final line is `-`. The refresh token is already covered by the signed body. For a bodyless GET, hash zero bytes, not `{}`. Encode the JSON once, sign that `Data`, then transmit those exact bytes. Do not reserialize it after signing. Sign the path and query exactly as sent, including percent encoding and query order.
 
-The server verifies ECDSA using SHA-256 over this message. With CryptoKit, use `signature(for: messageData)` and transmit `signature.derRepresentation`; do not hash twice or send the 64-byte raw representation. Public keys must be standard P-256 SubjectPublicKeyInfo PEM. The returned `keyId` is lowercase hex SHA-256 of the SPKI DER bytes. Secure Enclave's public-key export must be converted to that format in the Swift client.
+The server verifies ECDSA using SHA-256 over this message. With CryptoKit, use `signature(for: messageData)` and transmit `signature.derRepresentation`; do not hash twice or send the 64-byte raw representation. Public keys must be standard P-256 SubjectPublicKeyInfo PEM. The returned `keyId` is lowercase hex SHA-256 of the SPKI DER bytes. The client exports CryptoKit's `publicKey.pemRepresentation` in that SPKI format.
 
 Timestamp tolerance is two minutes in either direction. Every accepted nonce is persisted and cannot be reused for that installation. Generate a fresh nonce and signature for each retry, even after a 409 or 429. Client clock errors should prompt checking automatic date/time; do not disable signature verification.
 
@@ -63,7 +63,7 @@ A login with a different installation key returns HTTP 409, code `DEVICE_TRANSFE
 
 An accepted transfer immediately revokes previous sessions and refresh tokens and starts a six-hour cooldown. A further transfer during that period returns HTTP 429 `DEVICE_TRANSFER_COOLDOWN`, `Retry-After`, and `error.details.retryAfterSeconds`. Start a fresh Discord sign-in when attempting again after the cooldown; do not retain the two-minute handoff code for hours. The first registration is not a transfer. Returning to the same installation does not restart the cooldown. Signing out does not erase it.
 
-Switching Discord accounts requires a different installation key because a public key cannot be reassigned to another account. Preserve account-specific key references securely so switching back does not unnecessarily simulate a new phone.
+A public key cannot be reassigned to another Discord account. The supplied first client keeps one account identity per installed app/backend origin; it does not offer a multi-account switcher. Use the same Discord account when signing back into that installation.
 
 ## Refresh and logout
 
@@ -86,12 +86,20 @@ Switching Discord accounts requires a different installation key because a publi
 | POST | `/v1/auth/logout` | Revoke current session; authenticated |
 | GET | `/v1/me` | User, role, installation, cooldown, capabilities |
 | GET | `/v1/catalog` | `{products: [{retailer, upc, title}]}` |
+| GET | `/v1/settings` | Saved ZIP, center, products, alert preferences |
+| PUT | `/v1/settings` | Partial settings update for this account |
+| GET | `/v1/monitor/status` | Shared worker state and capability flags |
+| GET | `/v1/stores?scope=nearby` | Store observations and this account's notes/preferences |
+| GET | `/v1/stores/100` | Store detail, all observed catalog products |
+| PUT | `/v1/stores/100/preferences` | Private note, favorite, exclusion |
+| PUT | `/v1/stores/100/public-note` | Moderator-only public note |
+| GET | `/v1/stores/100/history` | Seven-day stock history |
 | GET | `/v1/events?limit=50&before=123` | This user's retained inbox, newest first |
 | POST | `/v1/events/123/read` | Mark this user's event as read |
 
-All rows after logout in the table also require an access token and installation signature. `GET /v1/me` currently reports `monitoring: false`, `remotePush: false`, and `appAttestRequired: false` to avoid implying unfinished integrations are active.
+All rows after logout in the table also require an access token and installation signature. `GET /v1/me` reports `monitoring` from server configuration, `inventory: true`, `predictions: false`, `remotePush: false`, and `appAttestRequired: false`. Monitoring enabled is configuration state, not proof of a successful provider request.
 
-Inbox `limit` is 1–100, default 50. Omit `before` for the first page and use the returned `nextCursor` for older pages. A response has `events: [{id, kind, payload, createdAt, readAt}]` and `nextCursor` (or null). Only the last seven days are visible. Cross-account event IDs return 404 on mark-read. No client-facing endpoint can manufacture events; the monitoring worker will generate them later. The current catalog is manually maintained in `catalog.json` and loaded on startup.
+Inbox `limit` is 1–100, default 50. Omit `before` for the first page and use the returned `nextCursor` for older pages. A response has `events: [{id, kind, payload, createdAt, readAt}]` and `nextCursor` (or null). Only the last seven days are visible. Cross-account event IDs return 404 on mark-read. No client-facing endpoint can manufacture events; the worker generates them from inventory changes matching the account's selections and preferences. The current catalog is manually maintained in `catalog.json` and loaded on startup.
 
 ## Errors and throttling
 
@@ -119,3 +127,40 @@ Inbox `limit` is 1–100, default 50. Omit `before` for the first page and use t
 | `DISCORD_UNAVAILABLE` | Let the user start a new login attempt later |
 
 Limits include 300 API requests/minute per client IP, 180 protected requests/minute per user, 10 login starts/10 minutes per IP, and 200 login starts/10 minutes globally. These are initial single-instance safeguards, not a capacity guarantee for 100 users. Infrastructure request logs must redact authorization headers, bodies, and OAuth callback queries.
+
+## App settings and inventory
+
+`PUT /v1/settings` accepts any subset of:
+
+```json
+{
+  "zip": "24060",
+  "products": ["196214158801"],
+  "alerts": {
+    "firstDecrease": true,
+    "soldOut": true,
+    "approaching": true,
+    "stockIncrease": false,
+    "anyDecrease": false,
+    "paused": false
+  }
+}
+```
+
+The default alerts are shown above. ZIP is exactly five ASCII digits, including leading zeros. The server resolves its coordinate; client coordinates and radius changes are not accepted. Products must be unique UPCs in the curated catalog. An empty array removes that account's monitoring demand. Omitting a field preserves its value; null does not delete the ZIP. Partial `alerts` fields merge with existing values. Authorization is checked again after asynchronous ZIP lookup.
+
+Settings responses contain `{zip, center: {latitude, longitude, label}, radiusMiles: 25, products, alerts}`. Before onboarding, `zip` and `center` are null. The `approaching` preference is saved, but no forecast events exist yet. `paused` will suppress notification delivery; eligible changes remain in the inbox with `payload.notificationsPaused: true`.
+
+`GET /v1/stores` supports `scope=nearby|covered`, `favorites=true|false`, a decimal-string `after` store-ID cursor, and `limit=1..250` (default 200). It returns `{stores, nextCursor, serverTime}`. Nearby uses distance from the saved ZIP center, at most 25 miles. Covered includes existing observations from other subscribed areas; abandoned coverage is retained as unknown. Favoriting does not create polling in another region. Excluded stores remain in API results with an `excluded` flag; the app hides them by default and the worker skips their alerts for that account.
+
+Each store has `id`, `retailer`, `name`, `address`, `city`, `state`, nullable `postalCode`, `phone`, `latitude`, `longitude`, `coordinateSource`, and `distanceMiles`; plus account-specific `favorite`, `excluded`, `privateNote`, shared `publicNote`, and `inventory`. `coordinateSource` is `dg`, `census`, or null. Distance is straight-line miles. Apple Maps driving time is requested on the iPhone from the saved ZIP center, on demand.
+
+Inventory rows contain `{upc, title, quantity, status, stale, observedAt, lastIncreaseAt, lastDecreaseAt}`. Timestamps are UTC ISO 8601 strings; increase/decrease can be null. Status is `available`, `back`, `out`, or `unknown`. More than nine minutes without a fresh observation, or no current subscription covering that store/product, yields `unknown` and `stale: true` while retaining quantity. A missing product row means no observation, not zero.
+
+A first positive observation is unknown; a successful zero is out. An increase marks new stock pending. If older known available stock remains, status stays available until total quantity reaches the pending new quantity. Crossing below that threshold signals new stock is likely selling: 3 available + 12 new = 15, then 14/13 available, 12 back, 11 available. A final zero is sold out and takes priority over a first-sale notification. Separate deliveries, opening-hours timing, confidence, and forecasts belong to Milestone 3. A monitoring gap resets pending inference.
+
+`PUT /v1/stores/:id/preferences` accepts optional `favorite`, `excluded` booleans and `privateNote` text (up to 2,000 UTF-16 code units). `PUT /v1/stores/:id/public-note` requires moderator access and `{note: "..."}` with the same limit. Empty text clears that note. Both return the updated store and do not accept a client-supplied owner ID.
+
+`GET /v1/stores/:id/history` accepts `before` (positive integer ID) and `limit=1..100` (default 50). It returns `{history, nextCursor}` newest first. Rows contain `id`, `upc`, `title`, nullable `previousQuantity`, `quantity`, `status`, `kind`, and `createdAt`. Kinds include `baseline`, `resumed`, `stock_increase`, `decrease`, `first_decrease`, and `sold_out`. Only the last seven days are visible. Unchanged quantities do not create repetitive history entries.
+
+`GET /v1/monitor/status` returns `{enabled, activeSearches, lastSuccessAt, delayedSearches, predictionsAvailable: false, remotePushAvailable: false}`. Metrics describe the shared worker. Missing rows and provider failures preserve previous inventory; they do not generate sold-out events.

@@ -46,6 +46,12 @@ export function loadConfig(env = process.env) {
       throw new Error('Production requires a mounted Railway volume and DATA_DIR equal to RAILWAY_VOLUME_MOUNT_PATH.');
     }
   }
+  const monitorEnabled = env.DG_MONITOR_ENABLED === 'true';
+  const dgNames = ['DG_AUTHORIZATION', 'DG_APP_SESSION_TOKEN', 'DG_APP_TOKEN',
+    'DG_CUSTOMER_GUID', 'DG_DEVICE_UNIQUE_ID', 'DG_PARTNER_API_TOKEN', 'DG_COOKIE'];
+  if (monitorEnabled && dgNames.some(name => !env[name]?.trim())) {
+    throw new Error('DG_MONITOR_ENABLED requires all DG server credential variables listed in .env.example.');
+  }
   return {
     production,
     host: env.HOST || (production ? '0.0.0.0' : '127.0.0.1'),
@@ -66,5 +72,15 @@ export function loadConfig(env = process.env) {
     transferCooldownMs: 6 * 60 * 60_000,
     historyTtlMs: 7 * 24 * 60 * 60_000,
     proofWindowMs: 2 * 60_000,
+    monitor: {
+      enabled: monitorEnabled,
+      credentials: Object.fromEntries(dgNames.map(name => [name, env[name] || ''])),
+      normalIntervalMs: 180_000,
+      fastIntervalMs: 10_000,
+      fastWindowMs: 72 * 60 * 60_000,
+      staleAfterMs: 9 * 60_000,
+      minRequestGapMs: 1000,
+      geocodeStores: env.STORE_GEOCODING_ENABLED !== 'false',
+    },
   };
 }

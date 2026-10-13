@@ -8,7 +8,7 @@ import { randomToken, challengeFor } from '../src/crypto.js';
 async function httpFixture(t) {
   const f = fixture(t);
   const errors = [];
-  const { server } = createServer({ ...f, logger: { error: value => errors.push(value) } });
+  const { server, appData } = createServer({ ...f, logger: { error: value => errors.push(value) } });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   t.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); });
@@ -24,7 +24,7 @@ async function httpFixture(t) {
       'X-Takeoff-Signature': signed.proof.signature,
     }, ...(data === undefined ? {} : { body: signed.body }) });
   };
-  return { ...f, base, errors };
+  return { ...f, base, errors, appData };
 }
 
 test('HTTP OAuth round trip returns a bound session and never redirects tokens to the app', async t => {
@@ -121,4 +121,37 @@ test('rate-limited sign-in returns Retry-After and ignores spoofed forwarding he
     headers: { 'x-real-ip': '192.0.2.4', 'x-forwarded-for': '203.0.113.99' } };
   assert.equal(clientIp(edge, 0), '127.0.0.1');
   assert.equal(clientIp(edge, 1), '192.0.2.4');
+});
+
+test('iPhone API settings, notes, history, and store filters retain authorization over HTTP', async t => {
+  const f = await httpFixture(t), a = device(), b = device();
+  const alice = await login(f, a), bob = await login(f, b, BOB);
+  f.db.prepare('INSERT INTO zip_regions (zip,latitude,longitude,label,resolved_at) VALUES (?,?,?,?,?)')
+    .run('24060', 37.23, -80.42, 'Blacksburg, VA', f.clock());
+  const request = (path, data, who = 'alice') => f.request(who === 'alice' ? a : b,
+    who === 'alice' ? alice.accessToken : bob.accessToken, path, data, data === undefined ? 'GET' : 'PUT');
+  const settings = await request('/v1/settings', { zip: '24060', products: ['196214158801'] });
+  assert.equal(settings.status, 200);
+  assert.equal((await settings.json()).center.latitude, 37.23);
+  assert.equal((await request('/v1/settings', { zip: '24060', products: ['bad'] })).status, 400);
+  assert.equal((await (await request('/v1/settings', undefined, 'bob')).json()).zip, null);
+  const { Inventory } = await import('../src/inventory.js');
+  const inventory = new Inventory(f);
+  inventory.ingest(f.appData.jobs().values().next().value, [{ id: '100', quantity: 2, address: 'Test Street',
+    city: 'Blacksburg', state: 'VA', latitude: 37.23, longitude: -80.42, distance: 1 }]);
+  assert.equal((await request('/v1/stores/100/preferences', { privateNote: 'Private!', favorite: true })).status, 200);
+  const other = await (await request('/v1/stores/100', undefined, 'bob')).json();
+  assert.equal(other.privateNote, ''); assert.equal(other.favorite, false);
+  assert.equal(other.inventory[0].status, 'unknown');
+  assert.equal((await request('/v1/stores/100/public-note', { note: 'No' }, 'bob')).status, 403);
+  assert.equal((await request('/v1/stores/100/public-note', { note: 'Limit one' })).status, 200);
+  assert.equal((await (await request('/v1/stores/100', undefined, 'bob')).json()).publicNote, 'Limit one');
+  const favorites = await (await request('/v1/stores?scope=covered&favorites=true')).json();
+  assert.deepEqual(favorites.stores.map(s => s.id), ['100']);
+  assert.equal((await (await request('/v1/stores?scope=covered&favorites=true', undefined, 'bob')).json()).stores.length, 0);
+  const history = await (await request('/v1/stores/100/history')).json();
+  assert.equal(history.history[0].kind, 'baseline');
+  assert.equal((await request('/v1/stores?userId=123')).status, 400);
+  assert.equal((await f.get('/v1/settings')).status, 401);
+  assert.equal(f.errors.length, 0);
 });

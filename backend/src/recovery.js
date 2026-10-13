@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { backup, DatabaseSync } from 'node:sqlite';
 import { transaction } from './database.js';
+import { latestSchemaVersion } from './migrations.js';
 
 // Prepare a NEW offline copy. Never modify the source backup or a live database.
 export async function prepareRestore(source, destination, now = Date.now()) {
@@ -12,7 +13,7 @@ export async function prepareRestore(source, destination, now = Date.now()) {
   let input, output, reserved = false;
   try {
     input = new DatabaseSync(source, { readOnly: true });
-    if (input.prepare('PRAGMA user_version').get().user_version !== 1 ||
+    if (![1, latestSchemaVersion].includes(input.prepare('PRAGMA user_version').get().user_version) ||
         input.prepare('PRAGMA integrity_check').get().integrity_check !== 'ok' ||
         input.prepare('PRAGMA foreign_key_check').all().length) {
       throw new Error('Backup integrity or schema validation failed.');

@@ -1,8 +1,8 @@
 {
   "name": "takeoff-backend",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Takeoff's private API and persistent account foundation",
+  "description": "Takeoff's private API, inventory worker, and persistent app data",
   "type": "module",
   "engines": { "node": ">=24 <25" },
   "scripts": {
