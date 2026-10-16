@@ -193,7 +193,7 @@ test('the actual Milestone 1 schema upgrades without losing accounts or cooldown
     .run('fixture-session', ALICE, 'fixture-key', 1, 9999999999999);
   previous.close();
   const db = openDatabase(directory);
-  assert.equal(db.prepare('PRAGMA user_version').get().user_version, 3);
+  assert.equal(db.prepare('PRAGMA user_version').get().user_version, 4);
   assert.equal(db.prepare('SELECT next_transfer_at FROM users').get().next_transfer_at, 9999999999999);
   assert.equal(db.prepare('SELECT id FROM sessions').get().id, 'fixture-session');
   assert.equal(db.prepare('SELECT COUNT(*) n FROM preferences').get().n, 0);

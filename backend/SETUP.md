@@ -1,6 +1,6 @@
 # Takeoff backend setup
 
-This guide covers a fresh backend deployment and recovery. If Railway is already set up from Milestone 1 or 2, use [the Milestone 3 upgrade guide](../docs/MILESTONE_3_UPGRADE.md), then [the Xcode guide](../docs/XCODE_TESTING.md). The native iPhone client is now included. There is no fake-login bypass in the running server.
+This guide covers a fresh backend deployment and recovery. If Railway is already set up with Milestone 3, use [the Milestone 4 upgrade guide](../docs/MILESTONE_4_UPGRADE.md), then [the Xcode guide](../docs/XCODE_TESTING.md). The native iPhone client is now included. There is no fake-login bypass in the running server.
 
 ## 1. Keep the source private
 
@@ -96,7 +96,7 @@ Let Railway provide `PORT`, or set its domain target port to match an explicit `
 
 `TRUST_PROXY_HOPS=1` trusts Railway's documented `X-Real-IP` header when requests must pass through its edge. Keep the container reachable through that trusted path; do not expose an alternate direct public port. If another proxy is added, verify its header rewriting before changing this setting. The fallback for other explicitly configured proxy chains reads `X-Forwarded-For` from the trusted end. Local development defaults to `0`, ignoring both headers. With `0` behind Railway, users can share the proxy's IP rate-limit bucket. The per-account limit also remains active. See [Railway networking headers](https://docs.railway.com/networking/public-networking/specs-and-limits).
 
-Register the generated HTTPS callback URI in Discord, deploy this new service, and open `https://YOUR-BACKEND.up.railway.app/health/ready`. The logs should report Takeoff API v0.3, the configured DG monitoring state, and that store-hours learning/departure inbox events are enabled while APNs is not.
+Register the generated HTTPS callback URI in Discord, deploy this new service, and open `https://YOUR-BACKEND.up.railway.app/health/ready`. The logs should report Takeoff API v0.4, the configured DG monitoring state, and that store-hours learning/departure inbox events are enabled while APNs is not.
 
 Configure this service without sleeping/serverless behavior when enabling its inventory worker. A mounted SQLite volume means this design is for one service replica; it is not a horizontally scaled database setup. This keeps the initial infrastructure small. Railway service and storage charges depend on your plan and usage; an always-on monitor is not promised to fit a free tier. Check the [current Railway plans](https://docs.railway.com/pricing/plans) before enabling paid resources.
 

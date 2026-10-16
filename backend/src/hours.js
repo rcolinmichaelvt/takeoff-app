@@ -5,6 +5,7 @@ import { validCoordinate } from './geography.js';
 export const DAY = 24 * 60 * 60_000;
 export const HOURS_MAX_AGE = 3 * DAY;
 const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+export const inventoryHoursFields = ['hrsMon', 'hrsTue', 'hrsWed', 'hrsThu', 'hrsFri', 'hrsSat', 'hrsSun'];
 const zones = { 'Eastern Standard Time': 'America/New_York', 'Central Standard Time': 'America/Chicago',
   'Mountain Standard Time': 'America/Denver', 'Pacific Standard Time': 'America/Los_Angeles',
   'US Mountain Standard Time': 'America/Phoenix', 'Alaskan Standard Time': 'America/Anchorage',
@@ -61,7 +62,7 @@ function sortedRanges(value) {
 }
 
 /** Normalize only complete, interpretable schedules. Unsupported data fails closed.
- * DG store-info wire formats can change. inspect-hours prints only public hours
+ * DG wire formats can change. inspect-hours prints only public hours
  * fields for adapting this boundary without logging request/session credentials.
  */
 export function normalizeHours(info, store, lookup = geoTZ.find) {
@@ -81,7 +82,14 @@ export function normalizeHours(info, store, lookup = geoTZ.find) {
     Temporal.Now.zonedDateTimeISO(timezone);
     const source = info.storeHours ?? info.hoursOfOperation ?? info.businessHours ?? info.hours ?? info.openingHoursSpecification;
     const weekly = Array.from({ length: 7 }, () => null);
-    if (Array.isArray(source)) {
+    if (inventoryHoursFields.some(key => Object.hasOwn(info, key))) {
+      for (const [index, key] of inventoryHoursFields.entries()) {
+        const value = info[key];
+        if (typeof value !== 'string') return null;
+        const match = value.trim().match(/^(\d{2})(\d{2}):(\d{2})(\d{2})$/);
+        weekly[index] = match ? pairRange(`${match[1]}:${match[2]}`, `${match[3]}:${match[4]}`) : sortedRanges(value);
+      }
+    } else if (Array.isArray(source)) {
       for (const entry of source) {
         const labels = entry?.dayOfWeek ?? entry?.day ?? entry?.dayName;
         const values = Array.isArray(labels) ? labels : [labels];

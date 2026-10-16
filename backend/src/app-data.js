@@ -2,9 +2,10 @@ import { requireCondition } from './errors.js';
 import { transaction } from './database.js';
 import { milesBetween } from './geography.js';
 import { Intelligence, TRAVEL_REFRESH_AGE } from './intelligence.js';
+import { Trips } from './trips.js';
 
 export const defaultAlerts = Object.freeze({ firstDecrease: true, soldOut: true, approaching: true,
-  stockIncrease: false, anyDecrease: false, paused: false });
+  stockIncrease: false, anyDecrease: false, tripChanges: true, paused: false });
 export const iso = value => value == null ? null : new Date(value).toISOString();
 
 export class AppData {
@@ -12,6 +13,7 @@ export class AppData {
     Object.assign(this, { db, config, catalog, geography, clock });
     this.products = new Map(catalog.map(p => [p.upc, p]));
     this.intelligence = new Intelligence({ db, config, clock });
+    this.trips = new Trips(this);
   }
 
   settings(discordId) {

@@ -35,7 +35,7 @@ test('the delivered v2 database upgrades with its active login, settings, notes,
   db.close();
   db = openDatabase(folder); t.after(() => db.close());
   f.db = db; f.auth = new AuthService(f);
-  assert.equal(db.prepare('PRAGMA user_version').get().user_version, 3);
+  assert.equal(db.prepare('PRAGMA user_version').get().user_version, 4);
   assert.equal(authenticate(f, dev, tokens.accessToken).discord_id, ALICE);
   const appData = new AppData({ ...f, catalog: loadCatalog() });
   const store = appData.store(ALICE, '100');

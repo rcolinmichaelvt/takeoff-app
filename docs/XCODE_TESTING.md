@@ -2,11 +2,11 @@
 
 Takeoff includes a real SwiftUI project at `ios/Takeoff.xcodeproj`. Open that project directly. The app targets **iPhone, iOS 17.0 or later**, uses Swift 5 language mode, and has no external Swift packages. Your reported iPhone on iOS 26.2 meets the deployment target. Xcode still needs the appropriate device support installed locally.
 
-The source and project structure were checked in a Linux workspace. **An Xcode build and on-device run have not been performed here.** The included six XCTest cases are ready to run on your Mac.
+The source and project structure were checked in a Linux workspace. **An Xcode build and on-device run have not been performed here.** The included ten XCTest cases are ready to run on your Mac.
 
 ## 1. Upgrade your existing Railway backend first
 
-Follow [MILESTONE_3_UPGRADE.md](MILESTONE_3_UPGRADE.md) when updating the working Milestone 2 app. Keep the existing project/signing configuration; the update only changes already-included Swift files. A fresh setup also needs the settings, store, note, inventory, and travel endpoints. Keep the same service URL and persistent `/data` volume.
+Follow [MILESTONE_4_UPGRADE.md](MILESTONE_4_UPGRADE.md) when updating the working Milestone 3 app. Keep the existing project/signing configuration; the update only changes already-included Swift files. A fresh setup also needs the settings, store, note, inventory, and travel endpoints. Keep the same service URL and persistent `/data` volume.
 
 You can test Discord sign-in and save a ZIP before enabling DG monitoring. An empty map is expected until the worker has valid DG credentials and at least one member has saved a ZIP and selected products.
 
@@ -20,6 +20,8 @@ Confirm these existing Railway values:
 | `MODERATOR_DISCORD_IDS` | Your ID too, if you want to test public notes |
 
 In the Discord Developer Portal, the registered OAuth redirect is **your Railway URL plus `/v1/auth/discord/callback`**. The `takeoff://` URL is the second hop, from your backend into the app; it is already registered in the project's Info.plist.
+
+For an incremental update, merge the ZIP into the existing repository first. The ZIP is not a standalone Xcode project. All changed Swift types are in existing target members; keep your current project, signing Team and bundle ID.
 
 ## 2. Open the project
 
@@ -70,11 +72,11 @@ Official references: [running on a device](https://developer.apple.com/documenta
 
 A green pin means at least one filtered product is likely for sale; yellow means back stock when no filtered product is green; gray means uncertain data when neither green nor yellow applies; red means all observed filtered products are sold out. The store detail shows each observed product separately. Initial positive observations are gray until enough changes are observed. Observations older than nine minutes, or without an active subscription covering them, also show unknown.
 
-The server uses DG coordinates if supplied. Otherwise it resolves public store addresses using the US Census geocoder. This runs separately from stock polling. Some addresses may not resolve; those stores still appear in the list when their distance is known. Geocoded coordinates are labeled in details. Apple Maps opens the selected place; a multi-store trip planner belongs to Milestone 4.
+The server uses DG coordinates if supplied. Otherwise it resolves public store addresses using the US Census geocoder. This runs separately from stock polling. Some addresses may not resolve; those stores still appear in the list when their distance is known. Geocoded coordinates are labeled in details. Use the Trips tab to suggest a one-way route, edit stops, and open it in Apple Maps. Full route handoff uses iOS 18.4 or later; older supported iOS opens only the first stop.
 
 ## 6. Run the included iOS checks
 
-Choose an installed **iPhone simulator** as the destination, keep the **Takeoff** scheme selected, then press **Command-U**. The six tests cover:
+Choose an installed **iPhone simulator** as the destination, keep the **Takeoff** scheme selected, then press **Command-U**. The ten tests cover:
 
 - Exact request-signing bytes and verification of a Node-generated P-256 DER signature.
 - Callback origin/state validation and rejection of duplicate login codes.
@@ -82,6 +84,10 @@ Choose an installed **iPhone simulator** as the destination, keep the **Takeoff*
 - Partial preference updates omitting unrelated fields.
 - New prediction payloads decoding without changing observed shelf status.
 - Older inbox payloads without address/prediction fields remaining readable.
+- Ordered Maps waypoints and the final one-way destination.
+- Rejection of invalid coordinates, empty routes, and more than ten stops.
+- Older alert preferences retaining choices while defaulting Trip changes on.
+- Preview requests omitting unmeasured legs and owner fields.
 
 These tests do not sign in or contact Railway. A simulator is a **different installation** if you later sign into it. Moving the same Discord account between your phone and a simulator invokes the six-hour transfer rule. The simulator uses a development-only software signing key; physical phones use Secure Enclave. For normal development, test the UI signed in on one installation at a time.
 
@@ -111,7 +117,7 @@ Sources: [Apple developer account overview](https://developer.apple.com/help/acc
 | Bundle identifier unavailable | Choose a unique bundle identifier and let automatic signing refresh. |
 | Project opens but no files/build target appear | Open the supplied `.xcodeproj`; preserve the sibling source/test directories. Avoid dragging duplicate copies into a blank project. |
 | “Set your Railway HTTPS URL” | Replace the placeholder in `Takeoff/AppConfiguration.swift`, then build again. |
-| Server response does not match this app / endpoint missing | Deploy the Milestone 3 backend update to the API service, then retry. A healthy older API can still lack the new endpoints. |
+| Server response does not match this app / endpoint missing | Deploy the Milestone 4 backend update to the API service, then retry. A healthy older API can still lack the new endpoints. |
 | Discord invalid redirect | Match the exact HTTPS callback in Discord to Railway's `PUBLIC_BASE_URL`. |
 | Discord access denied | Check the numeric user ID and the signed-in Discord account; apply the Railway allowlist change. |
 | Invalid or expired sign-in code | Restart sign-in and complete the device-transfer prompt within two minutes. |

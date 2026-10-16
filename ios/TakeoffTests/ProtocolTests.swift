@@ -3,6 +3,37 @@ import CryptoKit
 @testable import Takeoff
 
 final class ProtocolTests: XCTestCase {
+    func testMapsURLPreservesOrderedWaypointsAndOneWayDestination() throws {
+        let origin = TripPoint(latitude: 37, longitude: -80)
+        let stops = [TripPoint(latitude: 38, longitude: -79), TripPoint(latitude: 39, longitude: -78), TripPoint(latitude: 40, longitude: -77)]
+        let url = try XCTUnwrap(TripMaps.url(origin: origin, stops: stops))
+        let query = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
+        XCTAssertEqual(url.host, "maps.apple.com")
+        XCTAssertEqual(url.path, "/directions")
+        XCTAssertEqual(query.filter { $0.name == "waypoint" }.compactMap(\.value), ["38.0,-79.0", "39.0,-78.0"])
+        XCTAssertEqual(query.first { $0.name == "destination" }?.value, "40.0,-77.0")
+        XCTAssertEqual(query.first { $0.name == "source" }?.value, "37.0,-80.0")
+        XCTAssertEqual(query.first { $0.name == "mode" }?.value, "driving")
+    }
+    func testMapsURLRejectsMissingStopsInvalidCoordinatesAndOversizedRoutes() {
+        let origin = TripPoint(latitude: 37, longitude: -80)
+        XCTAssertNil(TripMaps.url(origin: origin, stops: []))
+        XCTAssertNil(TripMaps.url(origin: origin, stops: Array(repeating: origin, count: 11)))
+        XCTAssertNil(TripMaps.url(origin: origin, stops: [.init(latitude: 91, longitude: 0)]))
+        XCTAssertNil(TripMaps.url(origin: origin, stops: [.init(latitude: .nan, longitude: 0)]))
+    }
+    func testOlderPreferencesDefaultTripChangesWithoutChangingExistingChoices() throws {
+        let old = #"{"firstDecrease":false,"soldOut":true,"approaching":true,"stockIncrease":false,"anyDecrease":false,"paused":true}"#
+        let preferences = try APIJSON.decoder().decode(AlertPreferences.self, from: Data(old.utf8))
+        XCTAssertTrue(preferences.tripChanges)
+        XCTAssertTrue(preferences.paused)
+        XCTAssertFalse(preferences.firstDecrease)
+    }
+    func testTripPreviewOmitsUnmeasuredLegsAndOwnerFields() throws {
+        let request = TripRequest(products: ["196214158801"], storeIds: ["100"])
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: APIJSON.encoder().encode(request)) as? [String: Any])
+        XCTAssertEqual(Set(object.keys), ["products", "storeIds"])
+    }
     struct Vector: Decodable {
         let method: String, target: String, body: String, timestamp: String, nonce: String, token: String
         let messageBase64: String, publicKey: String, signatureBase64: String

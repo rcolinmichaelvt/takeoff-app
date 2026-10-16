@@ -1,4 +1,4 @@
-export const latestSchemaVersion = 3;
+export const latestSchemaVersion = 4;
 
 export const migration2 = `
 CREATE TABLE zip_regions (
@@ -133,4 +133,15 @@ CREATE TABLE approaching_sent (
   PRIMARY KEY(batch_id,discord_id)
 ) STRICT;
 PRAGMA user_version = 3;
+`;
+
+export const migration4 = `
+CREATE TABLE active_trips (
+  discord_id TEXT PRIMARY KEY REFERENCES users(discord_id),
+  version INTEGER NOT NULL,
+  trip_json TEXT,
+  state_json TEXT NOT NULL DEFAULT '{}',
+  updated_at INTEGER NOT NULL
+) STRICT;
+PRAGMA user_version = 4;
 `;

@@ -1,4 +1,5 @@
 import { validCoordinate } from './geography.js';
+import { inventoryHoursFields } from './hours.js';
 
 export class ProviderError extends Error {
   constructor(code, retryMs = 60_000) { super(code); this.code = code; this.retryMs = retryMs; }
@@ -27,7 +28,10 @@ export function normalizeStores(data) {
     return { id, quantity, address: text(raw.address), city: text(raw.city, 100), state: text(raw.state, 50),
       postalCode: text(String(raw.zipCode ?? raw.postalCode ?? raw.zip ?? ''), 12), phone: text(raw.phoneNumber, 40),
       latitude: coordinates ? lat : null, longitude: coordinates ? lon : null,
-      distance: Number.isFinite(distance) && distance >= 0 ? distance : null };
+      distance: Number.isFinite(distance) && distance >= 0 ? distance : null,
+      ...(inventoryHoursFields.some(key => Object.hasOwn(raw, key)) ? { hoursInfo: Object.fromEntries(
+        [...inventoryHoursFields, 'timeZone', 'timezone', 'timeZoneId', 'specialHours', 'holidayHours', 'specialOpeningHoursSpecification']
+          .filter(key => Object.hasOwn(raw, key)).map(key => [key, raw[key]])) } : {}) };
   });
 }
 
@@ -96,15 +100,6 @@ export function createDGProvider(config, fetchImpl = fetch) {
         method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8' },
         body: new URLSearchParams({ latitude: String(region.latitude), longitude: String(region.longitude), radius: '25', upc, offerSourceType: '0' }),
       }));
-    },
-    async fetchStoreInfo(id) {
-      if (!/^\d{1,12}$/.test(id)) throw new ProviderError('DG_INVALID_RESPONSE');
-      // Endpoint and storeinfo envelope are used by DG's public store directory.
-      const data = await requestJSON(`https://dggo.dollargeneral.com/omni/api/store/info/${id}`);
-      const info = data?.storeinfo;
-      if (!info || typeof info !== 'object' || Array.isArray(info) ||
-          info.storeNumber != null && String(info.storeNumber) !== id) throw new ProviderError('DG_INVALID_RESPONSE');
-      return info;
     },
   };
 }

@@ -4,7 +4,6 @@ import { fixture, device, login, ALICE, BOB } from './helpers.js';
 import { AppData } from '../src/app-data.js';
 import { Inventory } from '../src/inventory.js';
 import { normalizeHours, DAY } from '../src/hours.js';
-import { createMonitor } from '../src/monitor.js';
 import { loadCatalog } from '../src/catalog.js';
 import { eventPayload } from '../src/event-display.js';
 import { pruneDatabase } from '../src/database.js';
@@ -164,22 +163,6 @@ test('saved drive estimates are account-scoped, expire, and cannot target a diff
   f.advance(DAY); assert.equal(f.appData.store(ALICE, '100').travelEstimate, null);
 });
 
-test('hours updates are independent of polling, cached, and invalid responses suppress predictions', async t => {
-  const f = await setup(t); let calls = 0;
-  let resolveInfo;
-  const monitor = createMonitor({ ...f, logger: { warn() {} }, provider: {
-    fetchStoreInfo() { calls++; return new Promise(resolve => { resolveInfo = resolve; }); },
-    async fetchInventory() { return [store(12)]; },
-  } });
-  const loading = monitor.hoursTick(); f.advance(1000); await monitor.tick();
-  assert.equal(f.appData.store(ALICE, '100').inventory[0].quantity, 12);
-  resolveInfo(providerHours); await loading;
-  f.advance(1000); await monitor.hoursTick(); assert.equal(calls, 1);
-  f.db.prepare('UPDATE store_hours SET next_fetch_at=0').run();
-  const invalid = monitor.hoursTick(); resolveInfo({ hours: { Monday: 'unknown' } }); await invalid;
-  assert.equal(f.appData.intelligence.hours('100'), null);
-  await monitor.stop();
-});
 
 test('a changed schedule or lost coverage invalidates an active timing sample', async t => {
   const f = await setup(t); f.observe(12);

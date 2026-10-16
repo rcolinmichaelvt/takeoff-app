@@ -57,6 +57,35 @@ test('signed travel endpoints isolate accounts and reject injected owners, chang
   assert.equal(f.errors.length, 0);
 });
 
+test('signed trip routes persist private plans, reject copied access and stale edits, and clear only their owner', async t => {
+  const f = await httpFixture(t), alice = device(), bob = device();
+  const aliceTokens = await login(f, alice), bobTokens = await login(f, bob, BOB);
+  f.config.monitor.enabled = true;
+  f.db.prepare('INSERT INTO zip_regions VALUES (?,?,?,?,?)').run('24060', 37.23, -80.42, 'Blacksburg, VA', f.clock());
+  for (const id of [ALICE, BOB]) await f.appData.saveSettings(id, { zip: '24060', products: ['196214158801'] });
+  const inventory = new Inventory(f), job = f.appData.jobs().values().next().value;
+  for (const quantity of [0, 4, 3]) inventory.ingest(job, [{ id: '100', quantity, address: '100 Test Street',
+    city: 'Blacksburg', state: 'VA', latitude: 37.23, longitude: -80.42, distance: 0 }]);
+  assert.equal((await f.get('/v1/trip')).status, 401);
+  assert.equal((await f.request(device(), aliceTokens.accessToken, '/v1/trip')).status, 401);
+  const request = { products: ['196214158801'], storeIds: ['100'] };
+  const preview = await (await f.request(alice, aliceTokens.accessToken, '/v1/trip/preview', request)).json();
+  assert.equal(preview.trip.canOpen, false);
+  const point = { latitude: 37.23, longitude: -80.42 };
+  const input = { ...request, version: 0, zip: '24060', origin: point, departureAt: preview.trip.departureAt,
+    legs: [{ storeId: '100', from: point, to: point, seconds: 60, meters: 100 }] };
+  assert.equal((await f.request(alice, aliceTokens.accessToken, '/v1/trip', { ...input, discordId: BOB }, 'PUT')).status, 400);
+  const save = await f.request(alice, aliceTokens.accessToken, '/v1/trip', input, 'PUT');
+  assert.equal(save.status, 200); assert.equal((await save.json()).version, 1);
+  assert.equal((await f.request(alice, aliceTokens.accessToken, '/v1/trip', input, 'PUT')).status, 409);
+  const bobView = await (await f.request(bob, bobTokens.accessToken, '/v1/trip')).json();
+  assert.equal(bobView.trip, null);
+  assert.equal((await f.request(bob, bobTokens.accessToken, '/v1/trip/clear', { version: 1 })).status, 409);
+  assert.equal((await f.request(alice, aliceTokens.accessToken, '/v1/trip/clear', { version: 1 })).status, 200);
+  assert.equal(f.appData.trips.get(ALICE).trip, null);
+  assert.equal(f.errors.length, 0);
+});
+
 test('HTTP OAuth round trip returns a bound session and never redirects tokens to the app', async t => {
   const f = await httpFixture(t), dev = device(), verifier = randomToken();
   const startResponse = await f.post('/v1/auth/discord/start', { publicKey: dev.publicKey, codeChallenge: challengeFor(verifier) });

@@ -112,7 +112,7 @@ export function createServer({ config, db, discord, clock = Date.now, logger = c
         return send(res, 200, { discordId: session.discord_id, displayName: session.display_name,
           role: config.moderatorIds.has(session.discord_id) ? 'moderator' : 'member',
           deviceName: session.device_name, nextDeviceTransferAt: new Date(session.next_transfer_at).toISOString(),
-          capabilities: { monitoring: config.monitor.enabled, inventory: true, predictions: true, remotePush: false, appAttestRequired: false },
+          capabilities: { monitoring: config.monitor.enabled, inventory: true, predictions: true, trips: true, remotePush: false, appAttestRequired: false },
         });
       }
       if (method === 'GET' && route === '/v1/catalog') return send(res, 200, { products: catalog });
@@ -123,6 +123,20 @@ export function createServer({ config, db, discord, clock = Date.now, logger = c
         return send(res, 200, result);
       }
       if (method === 'GET' && route === '/v1/monitor/status') return send(res, 200, appData.monitoringStatus());
+      if (method === 'GET' && route === '/v1/trip') return send(res, 200, appData.trips.get(session.discord_id));
+      if (method === 'POST' && route === '/v1/trip/preview') {
+        limiter.take(`trip:${session.discord_id}`, 20, 60_000);
+        const { trip, candidates } = appData.trips.preview(session.discord_id, data);
+        return send(res, 200, { trip, candidates });
+      }
+      if (method === 'PUT' && route === '/v1/trip') {
+        limiter.take(`trip:${session.discord_id}`, 20, 60_000);
+        return send(res, 200, appData.trips.save(session.discord_id, data));
+      }
+      if (method === 'POST' && route === '/v1/trip/clear') {
+        limiter.take(`trip:${session.discord_id}`, 20, 60_000);
+        return send(res, 200, appData.trips.clear(session.discord_id, data));
+      }
       if (method === 'GET' && route === '/v1/travel-estimates/needed') {
         return send(res, 200, { candidates: appData.travelCandidates(session.discord_id) });
       }

@@ -34,7 +34,7 @@ struct SessionTokens: Codable {
 struct LoginStart: Decodable { let authorizationUrl: URL; let state: String; let keyId: String; let expiresIn: Int }
 struct LoginHandoff { let loginCode: String; let verifier: String }
 struct Member: Decodable {
-    struct Capabilities: Decodable { let monitoring: Bool; let remotePush: Bool; let appAttestRequired: Bool }
+    struct Capabilities: Decodable { let monitoring: Bool; let remotePush: Bool; let appAttestRequired: Bool; var trips: Bool? = nil }
     let discordId: String
     let displayName: String
     let role: String
@@ -55,7 +55,20 @@ struct AlertPreferences: Codable, Equatable {
     var approaching = true
     var stockIncrease = false
     var anyDecrease = false
+    var tripChanges = true
     var paused = false
+    init() {}
+    private enum CodingKeys: String, CodingKey { case firstDecrease, soldOut, approaching, stockIncrease, anyDecrease, tripChanges, paused }
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        firstDecrease = try values.decodeIfPresent(Bool.self, forKey: .firstDecrease) ?? true
+        soldOut = try values.decodeIfPresent(Bool.self, forKey: .soldOut) ?? true
+        approaching = try values.decodeIfPresent(Bool.self, forKey: .approaching) ?? true
+        stockIncrease = try values.decodeIfPresent(Bool.self, forKey: .stockIncrease) ?? false
+        anyDecrease = try values.decodeIfPresent(Bool.self, forKey: .anyDecrease) ?? false
+        tripChanges = try values.decodeIfPresent(Bool.self, forKey: .tripChanges) ?? true
+        paused = try values.decodeIfPresent(Bool.self, forKey: .paused) ?? false
+    }
 }
 struct Preferences: Codable {
     var zip: String?
@@ -196,5 +209,61 @@ enum APIJSON {
     }
     static func encoder() -> JSONEncoder {
         let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601; return encoder
+    }
+}
+
+// Trips use server-owned inventory decisions and account-private MapKit measurements.
+struct TripPoint: Codable, Equatable {
+    let latitude: Double; let longitude: Double
+    var coordinate: CLLocationCoordinate2D { .init(latitude: latitude, longitude: longitude) }
+    var mapValue: String { "\(latitude),\(longitude)" }
+}
+struct TripLeg: Encodable {
+    let storeId: String; let from: TripPoint; let to: TripPoint; let seconds: Int; let meters: Double
+}
+struct TripRequest: Encodable {
+    var version: Int? = nil
+    let products: [String]
+    var storeIds: [String]? = nil
+    var zip: String? = nil
+    var origin: SavedCenter? = nil
+    var legs: [TripLeg]? = nil
+    var departureAt: Date? = nil
+}
+struct TripResponse: Decodable { let version: Int; let trip: TripPlan? }
+struct TripPreview: Decodable { let trip: TripPlan; let candidates: [Store] }
+struct TripClear: Encodable { let version: Int }
+struct TripStop: Decodable, Identifiable {
+    let store: Store; let arrivalAt: Date?; let driveSeconds: Int?; let distanceMeters: Double?
+    let state: String; let eligible: Bool; let warnings: [String]; let expectedAt: Date?
+    var id: String { store.id }
+    var point: TripPoint? {
+        guard let coordinate = store.coordinate else { return nil }
+        return .init(latitude: coordinate.latitude, longitude: coordinate.longitude)
+    }
+}
+struct TripPlan: Decodable {
+    let zip: String; let origin: SavedCenter; let products: [String]; let departureAt: Date; let checkedAt: Date
+    let stopMinutes: Int; let maxStops: Int; let stops: [TripStop]; let totalDriveSeconds: Int
+    let needsReplan: Bool; let canOpen: Bool
+    var storeIds: [String] { stops.map(\.id) }
+    var originPoint: TripPoint { .init(latitude: origin.latitude, longitude: origin.longitude) }
+    func isCurrent(at date: Date = Date()) -> Bool {
+        canOpen && !needsReplan && date.timeIntervalSince(checkedAt) <= 15 * 60 &&
+        date.timeIntervalSince(departureAt) <= 15 * 60 && stops.allSatisfy { stop in
+            stop.store.inventory.contains { products.contains($0.upc) && $0.quantity > 0 && $0.effectiveStatus(at: date) != .unknown }
+        }
+    }
+}
+enum TripMaps {
+    static func url(origin: TripPoint, stops: [TripPoint]) -> URL? {
+        guard !stops.isEmpty, stops.count <= 10,
+              ([origin] + stops).allSatisfy({ $0.latitude.isFinite && $0.longitude.isFinite && abs($0.latitude) <= 90 && abs($0.longitude) <= 180 }) else { return nil }
+        var url = URLComponents()
+        url.scheme = "https"; url.host = "maps.apple.com"; url.path = "/directions"
+        url.queryItems = [URLQueryItem(name: "source", value: origin.mapValue), URLQueryItem(name: "mode", value: "driving")]
+        url.queryItems! += stops.dropLast().map { URLQueryItem(name: "waypoint", value: $0.mapValue) }
+        url.queryItems!.append(URLQueryItem(name: "destination", value: stops.last!.mapValue))
+        return url.url
     }
 }

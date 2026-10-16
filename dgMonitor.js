@@ -289,6 +289,8 @@ async function fetchInventory(sku) {
 
   const text = await res.text();
 
+  console.log(text)
+
   // Empty or non-JSON body — treat as auth expiry and refresh
   if (!text || text.trim() === "") {
     await refreshToken();

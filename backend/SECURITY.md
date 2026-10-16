@@ -46,3 +46,9 @@ The authenticated profile, public key, settings, notes, favorites, latest stock 
 Infrastructure logging may capture request URLs even when this application does not. Redact OAuth callback query strings and Authorization headers and restrict log access. Never enable indiscriminate body or header logging to debug a real sign-in.
 
 Before admitting paying users, complete the live integration checks, evaluate request volume and provider backoff, verify backup recovery, and review the completed client and inventory API. The existing automated suite tests specific defenses; it does not prove the full eventual application is production ready.
+
+## Trips
+
+Trips are private account data, accessed only through the same signed active-device API. Owners are taken from the session, never a JSON field. Preview/save recheck followed products, ZIP, coordinates, exclusions, fresh coverage, stock inference, hours and predictions. A version counter prevents stale edits from replacing a newer or cleared trip. Maximum ten stops, bounded values/body sizes, and per-account throttling limit work.
+
+Apple Maps measurements arrive from the device and are untrusted. They affect only that account's private arrival estimates; they never train shared restock models or change shelf classification. A modified client can mislead its own trip, which this free build cannot attest. The app sends public store coordinates and the saved ZIP origin to Apple Maps for requested driving estimates and route handoff; no DG credentials or private notes accompany that handoff. A route already opened in Maps is managed by Maps. APNs and App Attest remain Milestone 5.

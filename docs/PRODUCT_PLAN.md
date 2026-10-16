@@ -8,8 +8,8 @@ This plan records the decisions made before implementation. Features described h
 | --- | --- | --- | --- |
 | 1. Backend foundation | Persistent storage, Discord allowlist, signed sessions, one installation, six-hour transfers, catalog/inbox API, backups | Automated auth/recovery checks pass; then real Railway/Discord check | Backend delivered; owner reports Railway is set up |
 | 2. First iPhone app | SwiftUI project, sign-in, ZIP/product settings, map/store details, favorites/exclusions, private/public notes, history/inbox; supporting inventory API | Run on the owner's iPhone against Railway; accurate unknown/freshness labels | Owner reports iPhone sign-in, quantities, notes, privacy, favorites, and redeploy persistence passed; missed increase occurred while monitor was off |
-| 3. Inventory intelligence | New-stock batch tracking, opening-hours timing, store averages, confidence, patterns, approaching-time events | Agreed threshold examples and store-hours cases pass; compare with live observations | Source implemented; automated checks pass; live hours response and updated Xcode/device check pending |
-| 4. Trips | Suggested stop order, editable routes, arrival warnings, Apple Maps handoff, trip-change handling | Device-tested road estimates and Maps handoff | Planned |
+| 3. Inventory intelligence | New-stock batch tracking, opening-hours timing, store averages, confidence, patterns, approaching-time events | Agreed threshold examples and store-hours cases pass; compare with live observations | Source implemented; inventory hours now verified against the owner-supplied response; device/live learning checks remain |
+| 4. Trips | Suggested stop order, editable routes, arrival warnings, Apple Maps handoff, trip-change handling | Device-tested road estimates and Maps handoff | Source implemented; backend checks pass; Xcode/physical Maps handoff pending |
 | 5. Notifications and beta | APNs, device push revocation, App Attest, TestFlight preparation | Physical-device push/revocation and beta testing using paid membership | Planned |
 
 Local app tests can use foreground refresh and the server inbox before Milestone 5. No target date is set. Roughly 100 eventual users is a planning target, not a load test result.
@@ -72,7 +72,7 @@ APNs notifications will originate from server changes. The free local build can 
 
 Start with stores having stock likely for sale. Suggest an efficient one-way order, without returning to the starting point. Let users add and remove stops and recalculate. Back-stock stops are eligible only when predicted ready by arrival and must carry a warning. Do not add sold-out stores.
 
-Plan the route inside Takeoff and hand it to Apple Maps. Verify current Maps stop limits and the actual multiple-stop handoff on the target iPhone before selecting an operational cap. “Suggested efficient order” does not promise a mathematically optimal route for an unlimited number of stops.
+Plan the route inside Takeoff and hand it to Apple Maps. The first implementation caps trips at ten stops, allows five minutes per earlier stop, and uses the documented unified Maps URL on iOS 18.4+. The ten-stop handoff still requires the target iPhone check. Earlier iOS versions open only the first stop. “Suggested efficient order” does not promise a mathematically optimal route for an unlimited number of stops.
 
 When a planned stop changes, update the trip in Takeoff and notify according to the user's settings/capabilities. The user can return to replan and hand off an updated route. Do not promise automatic mutation of a route already being navigated in Apple Maps.
 
@@ -83,3 +83,11 @@ Users sign in with Discord. Begin with a server-side ID allowlist. One active in
 Build iPhone-only with SwiftUI and test locally first against Railway. Personal Team is the initial signing setup. The paid-developer milestone adds real remote notifications, stronger application attestation, and TestFlight distribution. Keep DG credentials and monitoring logic on the server.
 
 Deferred: Whop/payment entitlements, announcements and Pokémon update publishing, CVS/Walgreens monitoring, availability reports for retailers such as Target, and admin controls. Barcode scanning is excluded. Additional product ideas require the owner's approval before implementation.
+
+## Milestone 4 implementation choices
+
+Trips start at the saved ZIP center, use selected followed products, and consider fresh stores within that area. Suggestions start with likely-for-sale stores, using nearest-neighbour ordering and bounded 2-opt improvement by geographic distance. Sequential MapKit road estimates check the resulting route; this is not a guarantee of the fastest road route. Optional back-stock stops need medium/high confidence and a predicted time no later than road arrival. Closed-at-arrival stops block saving; missing hours on an otherwise available store produce a warning.
+
+One active trip is stored privately per account, with version checks against stale edits. Editing or recalculating starts a new plan from the saved ZIP, without GPS tracking. Estimates expire for handoff after 15 minutes. The server watches meaningful stop changes for 12 hours after departure, under the Trip changes switch (on by default); pause retains inbox events. A completed/outdated route can be cleared. A valid saved trip remains until replaced or cleared.
+
+Hours come from `hrsMon`–`hrsSun` in normal inventory responses; no separate store-info poll runs. Missing/invalid hours cannot produce invented samples. A fresh decrease after an unknown startup/resume baseline stays unknown, because no new-batch threshold was observed. It may create an ordinary decrease inbox event if enabled, but does not train a restock sample.

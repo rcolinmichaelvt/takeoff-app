@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { latestSchemaVersion, migration2, migration3 } from './migrations.js';
+import { latestSchemaVersion, migration2, migration3, migration4 } from './migrations.js';
 
 const schema = `
 CREATE TABLE users (
@@ -108,6 +108,7 @@ export function openDatabase(dataDir) {
   if (version === 0) { transaction(db, () => db.exec(schema)); version = 1; }
   if (version === 1) { transaction(db, () => db.exec(migration2)); version = 2; }
   if (version === 2) { transaction(db, () => db.exec(migration3)); version = 3; }
+  if (version === 3) { transaction(db, () => db.exec(migration4)); version = 4; }
   if (version !== latestSchemaVersion) {
     db.close();
     throw new Error('Unsupported database version; use the application version that created this database.');

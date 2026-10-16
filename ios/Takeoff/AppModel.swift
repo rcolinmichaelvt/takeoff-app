@@ -25,6 +25,14 @@ final class AppModel: ObservableObject {
     @Published var connectionWarning: String?
     @Published var needsTransfer = false
     @Published var lastRefresh: Date?
+    @Published var trip: TripPlan?
+    @Published var tripDraft: TripPlan?
+    @Published var tripCandidates: [Store] = []
+    @Published var tripBusy = false
+    @Published var tripProgress: String?
+    private var tripVersion = 0
+    private var tripGeneration = UUID()
+    private var tripRequest: MKDirections?
     private var api: APIClient?
     private var pendingHandoff: LoginHandoff?
     private let webSignIn = WebSignIn()
@@ -87,10 +95,13 @@ final class AppModel: ObservableObject {
             let page = try await refreshStores(api, query: "scope=\(scope)", minimumCount: stores.count)
             let saved = try await refreshStores(api, query: "scope=covered&favorites=true", minimumCount: favorites.count)
             let inbox = try await refreshInbox(api, minimumCount: events.count)
+            var savedTrip: TripResponse?
+            if member?.capabilities.trips == true { savedTrip = try await api.get("/v1/trip") }
             guard phase == .signedIn, revision == startedAtRevision else { return }
             preferences = settings; monitoring = status; stores = page.stores; storeCursor = page.nextCursor
             favorites = saved.stores; favoriteCursor = saved.nextCursor; events = inbox.events; eventCursor = inbox.nextCursor
             lastRefresh = Date(); connectionWarning = nil
+            if !tripBusy, let savedTrip { trip = savedTrip.trip; tripVersion = savedTrip.version }
         } catch { if revision == startedAtRevision { await report(error, quiet: quiet) } }
     }
     private func refreshStores(_ api: APIClient, query: String, minimumCount: Int) async throws -> StoresPage {
@@ -184,7 +195,7 @@ final class AppModel: ObservableObject {
     }
     func refreshDriveEstimate() async {
         guard phase == .signedIn, member?.capabilities.monitoring == true, preferences.alerts.approaching,
-              !refreshingDrive, Date() >= nextDriveRequest, UIApplication.shared.applicationState == .active else { return }
+              !refreshingDrive, !tripBusy, Date() >= nextDriveRequest, UIApplication.shared.applicationState == .active else { return }
         refreshingDrive = true; defer { refreshingDrive = false; driveRequest = nil }
         do {
             let api = try client()
@@ -234,6 +245,7 @@ final class AppModel: ObservableObject {
     }
     private func clearVisibleAccount() {
         cancelDriveEstimate(); driveRetryAfter = [:]; nextDriveRequest = .distantPast
+        cancelTripPlanning(); trip = nil; tripDraft = nil; tripCandidates = []; tripVersion = 0
         revision += 1
         phase = .signedOut; member = nil; stores = []; favorites = []; events = []; catalog = []
         preferences = .empty; monitoring = nil; pendingHandoff = nil; needsTransfer = false
@@ -248,5 +260,125 @@ final class AppModel: ObservableObject {
         } else { explanation = error.localizedDescription }
         if quiet && phase == .signedIn { connectionWarning = explanation }
         else { message = explanation }
+    }
+}
+
+extension AppModel {
+    func cancelTripPlanning() {
+        tripGeneration = UUID(); tripRequest?.cancel()
+    }
+    func loadTripCandidates(products: [String]) async {
+        guard !tripBusy, phase == .signedIn else { return }
+        let account = member?.discordId
+        do {
+            let preview: TripPreview = try await client().post("/v1/trip/preview", body: TripRequest(products: products, storeIds: []))
+            guard phase == .signedIn, member?.discordId == account else { return }
+            tripCandidates = preview.candidates
+        } catch { await report(error) }
+    }
+    func buildTrip(products: [String], storeIds: [String]? = nil) async {
+        guard !tripBusy, phase == .signedIn, UIApplication.shared.applicationState == .active else { return }
+        guard member?.capabilities.trips == true else {
+            message = "Deploy the Milestone 4 backend before planning trips."; return
+        }
+        if storeIds?.isEmpty == true { await clearTrip(); return }
+        tripBusy = true; revision += 1; cancelDriveEstimate()
+        let generation = UUID(); tripGeneration = generation
+        let account = member?.discordId
+        defer { tripBusy = false; tripProgress = nil; tripRequest = nil; revision += 1 }
+        do {
+            let api = try client()
+            let saved: TripResponse = try await api.get("/v1/trip")
+            try Task.checkCancellation()
+            guard tripGeneration == generation, phase == .signedIn, member?.discordId == account else { return }
+            trip = saved.trip; tripVersion = saved.version
+            tripProgress = "Finding an efficient stop order…"
+            var request = TripRequest(products: products, storeIds: storeIds)
+            let preview: TripPreview = try await api.post("/v1/trip/preview", body: request)
+            try Task.checkCancellation()
+            guard tripGeneration == generation, phase == .signedIn, member?.discordId == account else { return }
+            tripDraft = preview.trip; tripCandidates = preview.candidates
+            guard !preview.trip.stops.isEmpty else {
+                message = "No fresh, likely-for-sale stores match these items. You can check Add stop for predicted arrivals."; return
+            }
+            var legs: [TripLeg] = [], from = preview.trip.originPoint
+            var departure = preview.trip.departureAt
+            for (index, stop) in preview.trip.stops.enumerated() {
+                try Task.checkCancellation()
+                guard tripGeneration == generation, UIApplication.shared.applicationState == .active else { return }
+                guard let to = stop.point else { throw ClientError.message("A stop has no usable map coordinate.") }
+                tripProgress = "Checking drive \(index + 1) of \(preview.trip.stops.count)…"
+                let directions = MKDirections.Request()
+                directions.source = MKMapItem(placemark: MKPlacemark(coordinate: from.coordinate))
+                directions.destination = MKMapItem(placemark: MKPlacemark(coordinate: to.coordinate))
+                directions.transportType = .automobile; directions.departureDate = departure
+                let search = MKDirections(request: directions); tripRequest = search
+                let estimate = try await search.calculateETA()
+                try Task.checkCancellation()
+                guard tripGeneration == generation, phase == .signedIn, member?.discordId == account else { return }
+                guard estimate.expectedTravelTime.isFinite, estimate.expectedTravelTime > 0, estimate.expectedTravelTime <= 14400,
+                      estimate.distance.isFinite, estimate.distance >= 0, estimate.distance <= 1_000_000 else {
+                    throw ClientError.message("Apple Maps could not provide a usable driving estimate for this stop.")
+                }
+                let seconds = Int(ceil(estimate.expectedTravelTime))
+                legs.append(.init(storeId: stop.id, from: from, to: to, seconds: seconds, meters: estimate.distance))
+                from = to; departure = departure.addingTimeInterval(Double(seconds + preview.trip.stopMinutes * 60))
+                // Keep routing calls sequential and give Maps room to throttle.
+                if index + 1 < preview.trip.stops.count { try await Task.sleep(for: .seconds(1)) }
+            }
+            request.storeIds = preview.trip.storeIds; request.legs = legs
+            request.zip = preview.trip.zip; request.origin = preview.trip.origin; request.departureAt = preview.trip.departureAt
+            let checked: TripPreview = try await api.post("/v1/trip/preview", body: request)
+            try Task.checkCancellation()
+            guard tripGeneration == generation, phase == .signedIn, member?.discordId == account else { return }
+            tripDraft = checked.trip; tripCandidates = checked.candidates
+            guard checked.trip.canOpen else {
+                message = "Review the route warnings and remove stops that cannot be reached in time. This draft hasn't replaced your saved trip."; return
+            }
+            request.version = saved.version
+            let result: TripResponse = try await api.put("/v1/trip", body: request)
+            guard tripGeneration == generation, phase == .signedIn, member?.discordId == account else { return }
+            trip = result.trip; tripVersion = result.version; tripDraft = nil
+        } catch {
+            guard tripGeneration == generation, phase == .signedIn, member?.discordId == account else { return }
+            if let mapError = error as? MKError, mapError.code == .loadingThrottled {
+                message = "Apple Maps is limiting requests. Wait a few minutes, then tap Recalculate. Your saved trip is still available."
+            } else { await report(error) }
+        }
+    }
+    func clearTrip() async {
+        guard !tripBusy, phase == .signedIn else { return }
+        tripBusy = true; revision += 1
+        let account = member?.discordId
+        defer { tripBusy = false; revision += 1 }
+        do {
+            let result: TripResponse = try await client().post("/v1/trip/clear", body: TripClear(version: tripVersion))
+            guard phase == .signedIn, member?.discordId == account else { return }
+            trip = result.trip; tripVersion = result.version; tripDraft = nil; tripCandidates = []
+        } catch { await report(error) }
+    }
+    func openTripInMaps() async {
+        guard !tripBusy, tripDraft == nil, phase == .signedIn else { return }
+        tripBusy = true; revision += 1
+        let account = member?.discordId
+        defer { tripBusy = false; revision += 1 }
+        do {
+            let response: TripResponse = try await client().get("/v1/trip")
+            guard phase == .signedIn, member?.discordId == account, UIApplication.shared.applicationState == .active else { return }
+            trip = response.trip; tripVersion = response.version
+            guard let plan = response.trip, plan.isCurrent() else {
+                message = "The trip needs a fresh check. Review the warnings and tap Recalculate."; return
+            }
+            if #available(iOS 18.4, *) {
+                let stops = plan.stops.compactMap(\.point)
+                guard stops.count == plan.stops.count, let url = TripMaps.url(origin: plan.originPoint, stops: stops) else { return }
+                let opened = await UIApplication.shared.open(url)
+                if !opened { message = "Apple Maps couldn't open this route. Try again from Trips." }
+            } else if let first = plan.stops.first?.point {
+                let source = MKMapItem(placemark: MKPlacemark(coordinate: plan.originPoint.coordinate))
+                let destination = MKMapItem(placemark: MKPlacemark(coordinate: first.coordinate))
+                MKMapItem.openMaps(with: [source, destination], launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving])
+            }
+        } catch { await report(error) }
     }
 }

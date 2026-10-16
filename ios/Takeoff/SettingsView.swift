@@ -122,6 +122,7 @@ struct AlertSettingsView: View {
                 Toggle("Sold out", isOn: $alerts.soldOut)
                 Toggle("Stock increases", isOn: $alerts.stockIncrease)
                 Toggle("Other stock decreases", isOn: $alerts.anyDecrease)
+                Toggle("Trip changes", isOn: $alerts.tripChanges)
             }
             Section {
                 Toggle("Approaching predicted restock", isOn: $alerts.approaching)

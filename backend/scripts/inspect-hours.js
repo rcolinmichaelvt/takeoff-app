@@ -1,35 +1,24 @@
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { loadConfig } from '../src/config.js';
-import { createDGProvider } from '../src/dg-provider.js';
-import { normalizeHours } from '../src/hours.js';
+import { scheduleView, HOURS_MAX_AGE } from '../src/hours.js';
 
-// Read-only diagnostic. Never print credentials, headers, full provider responses,
-// or user records. The output is limited to public store hours and field names.
+// Read-only: inspect the hours captured by the existing inventory poll. No
+// additional DG request, credentials, private notes, or account records.
 const id = process.argv[2];
 if (!/^\d{1,12}$/.test(id || '')) { console.error('Usage: npm run inspect-hours -- STORE_NUMBER'); process.exitCode = 1; }
 else {
-  let provider, db;
+  let db;
   try {
     const config = loadConfig();
-    provider = createDGProvider(config);
-    const info = await provider.fetchStoreInfo(id);
     db = new DatabaseSync(path.join(config.dataDir, 'takeoff.sqlite'), { readOnly: true });
-    const store = db.prepare('SELECT latitude,longitude FROM stores WHERE id=?').get(id) || {};
-    const safe = (value, depth = 0) => {
-      if (depth > 5) return '[nested]';
-      if (typeof value === 'string') return value.slice(0, 400);
-      if (Array.isArray(value)) return value.slice(0, 40).map(v => safe(v, depth + 1));
-      if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value)
-        .filter(([key]) => !/token|secret|cookie|authorization|customer|guid|user/i.test(key)).slice(0, 40)
-        .map(([key, v]) => [key, safe(v, depth + 1)]));
-      return value;
-    };
-    const hoursFields = Object.fromEntries(Object.entries(info)
-      .filter(([key]) => /hours|opening|closing|timezone|monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(key))
-      .map(([key, value]) => [key, safe(value)]));
-    console.log(JSON.stringify({ storeId: id, fields: Object.keys(info), hoursFields,
-      coordinatesAvailable: store.latitude != null && store.longitude != null, normalized: normalizeHours(info, store) }, null, 2));
+    const store = db.prepare('SELECT latitude,longitude FROM stores WHERE id=?').get(id);
+    const hours = db.prepare('SELECT schedule_json,updated_at,last_error FROM store_hours WHERE store_id=?').get(id);
+    const schedule = hours?.schedule_json ? JSON.parse(hours.schedule_json) : null;
+    console.log(JSON.stringify({ storeId: id, source: 'monitored_inventory',
+      coordinatesAvailable: store?.latitude != null && store?.longitude != null,
+      status: !hours ? 'waiting_for_inventory_hours' : !schedule ? 'unrecognized' : (hours.updated_at > Date.now() || Date.now() - hours.updated_at > HOURS_MAX_AGE) ? 'stale' : 'ready',
+      lastError: hours?.last_error ?? null, hours: schedule ? scheduleView(schedule, hours.updated_at) : null }, null, 2));
   } catch (error) { console.error(error.code || 'Store hours diagnostic failed. Check this service’s configuration.'); process.exitCode = 1; }
-  finally { provider?.close(); db?.close(); }
+  finally { db?.close(); }
 }

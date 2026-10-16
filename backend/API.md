@@ -99,7 +99,7 @@ A public key cannot be reassigned to another Discord account. The supplied first
 | GET | `/v1/events?limit=50&before=123` | This user's retained inbox, newest first |
 | POST | `/v1/events/123/read` | Mark this user's event as read |
 
-All rows after logout in the table also require an access token and installation signature. `GET /v1/me` reports `monitoring` from server configuration, `inventory: true`, `predictions: true`, `remotePush: false`, and `appAttestRequired: false`. Monitoring enabled is configuration state, not proof of a successful provider request.
+All rows after logout in the table also require an access token and installation signature. `GET /v1/me` reports `monitoring` from server configuration, `inventory: true`, `predictions: true`, `trips: true`, `remotePush: false`, and `appAttestRequired: false`. Monitoring enabled is configuration state, not proof of a successful provider request.
 
 Inbox `limit` is 1–100, default 50. Omit `before` for the first page and use the returned `nextCursor` for older pages. A response has `events: [{id, kind, payload, createdAt, readAt}]` and `nextCursor` (or null). Only the last seven days are visible. Cross-account event IDs return 404 on mark-read. No client-facing endpoint can manufacture events; the worker generates them from inventory changes matching the account's selections and preferences. The current catalog is manually maintained in `catalog.json` and loaded on startup.
 
@@ -181,3 +181,39 @@ Each inventory row adds nullable `forecast: {batchId, startedAt, pendingQuantity
 Store responses add nullable `travelEstimate: {seconds, updatedAt, source: "apple_maps_device"}` for the requesting account only. A changed ZIP/destination or age over 24 hours invalidates it. No straight-line distance is labeled as driving time.
 
 New stock events use separate `payload.address` and quantity-only `payload.body`. Older numbered bodies are enriched/stripped on read when a store record is available, without changing their read state. `approaching` payloads add `batchId`, `predictedAt`, `departureAt`, `driveSeconds`, `driveUpdatedAt`, `confidence`, and `notificationsPaused`. They are historical snapshots, not guaranteed current predictions. Live store detail returns the latest estimate. At most one approaching event per account/batch is persisted; a sold batch, stale stock, missing hours/ETA, excluded store, unfollowed product, removed account, or disabled toggle cannot create a new eligible event. Late warnings beyond the two-minute scheduling grace are skipped. There is no average-reached event and no APNs delivery in this milestone.
+
+## Milestone 4: hours and trips
+
+Inventory store records carry `hrsMon` through `hrsSun`, such as `0800:2200`. The server validates all seven fields, derives the store timezone from its coordinates when necessary, and caches the schedule before recording a new arrival. Hours refresh with normal stock polling, including zero-stock results. Partial or invalid schedules suppress timing predictions but preserve stock observations. No separate store-info request runs. Previously valid hours without a replacement expire after 72 hours.
+
+Every trip endpoint requires the active installation signature and uses the authenticated account as owner. JSON remains limited to 16 KiB. Trip writes/previews share a limit of 20 per minute per account; the global signed-request limit also applies.
+
+| Method | Path | Request / response |
+| --- | --- | --- |
+| GET | `/v1/trip` | `{version, trip}`; `trip` is null before saving or after clearing |
+| POST | `/v1/trip/preview` | `{products, storeIds?}`; returns `{trip, candidates}` without saving |
+| POST | `/v1/trip/preview` | With `zip, origin, departureAt, legs`, validate a measured preview without changing its order |
+| PUT | `/v1/trip` | Save the measured preview with `version`; returns `{version, trip}` |
+| POST | `/v1/trip/clear` | `{version}`; clear only this account's route and increment the version |
+
+Products must be nonempty, approved, and followed by this account. Omit `storeIds` to suggest up to ten fresh likely-for-sale stores; supply a unique list to edit and geographically reorder it. Candidates include nearby, nonexcluded available stores and back-stock stores with medium/high forecasts. Selecting none in a preview returns only candidates. It cannot save an empty trip. Use clear instead.
+
+A measured preview includes the preview's ZIP, origin and departure time, and exactly one leg for each ordered store ID:
+
+```json
+{
+  "storeId": "14838",
+  "from": {"latitude": 39.15, "longitude": -77.4},
+  "to": {"latitude": 39.1446, "longitude": -77.4135},
+  "seconds": 600,
+  "meters": 4200
+}
+```
+
+These are example values, not a real measured route. `seconds` is an integer from 1–14400; `meters` is finite and 0–1000000. Coordinates must exactly match the saved origin and successive current store coordinates. Departure must be within the previous 15 minutes (30 seconds future tolerance); total travel plus five-minute stop allowances must fit within 12 hours. A client-reported drive is untrusted and affects only its owner's route. It does not change inventory, public forecasts, or another user's estimates.
+
+The response plan includes `zip, origin, products, departureAt, checkedAt, stopMinutes: 5, maxStops: 10, totalDriveSeconds, needsReplan, canOpen` and ordered `stops`. Each stop has its account-specific `store`, `arrivalAt`, `driveSeconds`, `distanceMeters`, `state`, `eligible`, `warnings`, and `expectedAt`. Read recomputes eligibility from current stock, coverage, exclusions, followed products, ZIP, hours, and predictions. Saving requires all stops eligible. Back stock stays yellow and needs a confident estimate by arrival; sold-out, unknown, stale or closed-at-arrival stops cannot be saved or handed off. Missing hours on otherwise available stock produces a warning. A previously saved invalid stop remains visible for removal.
+
+`INVALID_TRIP` is HTTP 400. `TRIP_CHANGED`, `TRIP_UNAVAILABLE`, and `TRIP_NOT_READY` are HTTP 409; refresh and review the route. The client checks again immediately before opening Maps. `needsReplan` becomes true after 15 minutes. Successful saving replaces the single active trip atomically; failed edits leave it intact. Version checks also prevent a stale response from reviving a cleared trip.
+
+`alerts.tripChanges` defaults true and can be changed with the existing settings API. For 12 hours after departure, the worker persists `trip_change` inbox events on meaningful stock/eligibility changes or forecast shifts of at least five minutes. Comparison state survives redeploys. Excluded stores, no-longer-followed products, changed ZIPs, and revoked accounts do not generate those alerts. Pause retains eligible inbox events. Quantities can change without changing route eligibility; ordinary inventory alert preferences cover those changes. No background app polling or APNs is added.

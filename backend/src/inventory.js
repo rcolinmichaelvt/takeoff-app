@@ -1,6 +1,7 @@
 import { transaction } from './database.js';
 import { milesBetween } from './geography.js';
 import { storeAddress } from './event-display.js';
+import { DAY, normalizeHours } from './hours.js';
 
 // Shelf inference remains independent of predicted timing: no timed green pins.
 export function observeInventory(previous, quantity, now, maximumGap = 9 * 60_000) {
@@ -60,6 +61,15 @@ export class Inventory {
         this.db.prepare(`INSERT INTO area_inventory (zip,store_id,upc,distance,seen_at) VALUES (?,?,?,?,?)
           ON CONFLICT(zip,store_id,upc) DO UPDATE SET distance=excluded.distance,seen_at=excluded.seen_at`)
           .run(job.zip, store.id, job.upc, distance, now);
+        if (store.hoursInfo !== undefined) {
+          const location = this.db.prepare('SELECT latitude,longitude FROM stores WHERE id=?').get(store.id);
+          const schedule = normalizeHours(store.hoursInfo, location);
+          this.db.prepare(`INSERT INTO store_hours (store_id,schedule_json,updated_at,next_fetch_at,last_error)
+            VALUES (?,?,?,?,?) ON CONFLICT(store_id) DO UPDATE SET schedule_json=excluded.schedule_json,
+            updated_at=excluded.updated_at,next_fetch_at=excluded.next_fetch_at,last_error=excluded.last_error`)
+            .run(store.id, schedule ? JSON.stringify(schedule) : null, schedule ? now : null, now + DAY,
+              schedule ? null : 'INVENTORY_HOURS_UNRECOGNIZED');
+        }
         const previous = this.db.prepare('SELECT * FROM inventory WHERE store_id=? AND upc=?').get(store.id, job.upc);
         const next = observeInventory(previous, store.quantity, now, this.config.monitor.staleAfterMs);
         this.appData.intelligence.observe(store.id, job.upc, previous, next, now);
