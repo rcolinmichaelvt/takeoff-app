@@ -62,7 +62,6 @@ struct DiscoverView: View {
             }
             .navigationTitle("Takeoff").navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { Text(model.preferences.zip.map { "ZIP \($0)" } ?? "Discover").font(.caption).foregroundStyle(.secondary) }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { Task { await model.refresh() } } label: {
                         if model.refreshing { ProgressView() } else { Image(systemName: "arrow.clockwise") }
@@ -83,8 +82,13 @@ struct DiscoverView: View {
     }
     private var controls: some View {
         VStack(spacing: 10) {
+            HStack {
+                Text(model.preferences.zip.map { "ZIP \($0)" } ?? "Discover")
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                Spacer()
+            }
             Picker("Area", selection: Binding(get: { model.scope }, set: { value in Task { await model.changeScope(value) } })) {
-                Text("Your 25 miles").tag("nearby"); Text("All covered areas").tag("covered")
+                Text("Your area").tag("nearby"); Text("All covered areas").tag("covered")
             }.pickerStyle(.segmented).disabled(model.refreshing)
             HStack {
                 Button { showProducts = true } label: {

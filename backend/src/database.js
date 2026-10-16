@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { latestSchemaVersion, migration2 } from './migrations.js';
+import { latestSchemaVersion, migration2, migration3 } from './migrations.js';
 
 const schema = `
 CREATE TABLE users (
@@ -107,6 +107,7 @@ export function openDatabase(dataDir) {
   let version = db.prepare('PRAGMA user_version').get().user_version;
   if (version === 0) { transaction(db, () => db.exec(schema)); version = 1; }
   if (version === 1) { transaction(db, () => db.exec(migration2)); version = 2; }
+  if (version === 2) { transaction(db, () => db.exec(migration3)); version = 3; }
   if (version !== latestSchemaVersion) {
     db.close();
     throw new Error('Unsupported database version; use the application version that created this database.');
@@ -125,5 +126,7 @@ export function pruneDatabase(db, now, historyTtlMs) {
     db.prepare('DELETE FROM events WHERE created_at <= ?').run(now - historyTtlMs);
     db.prepare('DELETE FROM audit_events WHERE created_at <= ?').run(now - 30 * 24 * 60 * 60_000);
     db.prepare('DELETE FROM inventory_history WHERE created_at <= ?').run(now - historyTtlMs);
+    db.prepare('DELETE FROM restock_batches WHERE ended_at <= ?').run(now - historyTtlMs);
+    db.prepare('DELETE FROM travel_estimates WHERE updated_at <= ?').run(now - historyTtlMs);
   });
 }

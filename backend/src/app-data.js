@@ -1,6 +1,7 @@
 import { requireCondition } from './errors.js';
 import { transaction } from './database.js';
 import { milesBetween } from './geography.js';
+import { Intelligence, TRAVEL_REFRESH_AGE } from './intelligence.js';
 
 export const defaultAlerts = Object.freeze({ firstDecrease: true, soldOut: true, approaching: true,
   stockIncrease: false, anyDecrease: false, paused: false });
@@ -10,6 +11,7 @@ export class AppData {
   constructor({ db, config, catalog, geography, clock = Date.now }) {
     Object.assign(this, { db, config, catalog, geography, clock });
     this.products = new Map(catalog.map(p => [p.upc, p]));
+    this.intelligence = new Intelligence({ db, config, clock });
   }
 
   settings(discordId) {
@@ -71,12 +73,14 @@ export class AppData {
   }
 
   storeView(row, preferences, covered) {
+    const timing = this.intelligence.timing(row.id);
     const inventory = this.db.prepare('SELECT * FROM inventory WHERE store_id = ? ORDER BY upc').all(row.id)
       .filter(item => this.products.has(item.upc)).map(item => {
         const stale = !covered.has(`${row.id}:${item.upc}`) || this.clock() - item.observed_at > this.config.monitor.staleAfterMs;
         return { upc: item.upc, title: this.products.get(item.upc).title, quantity: item.quantity,
           status: stale ? 'unknown' : item.status, stale, observedAt: iso(item.observed_at),
-          lastIncreaseAt: iso(item.last_increase_at), lastDecreaseAt: iso(item.last_decrease_at) };
+          lastIncreaseAt: iso(item.last_increase_at), lastDecreaseAt: iso(item.last_decrease_at),
+          forecast: this.intelligence.forecast(row.id, item, stale, timing) };
       });
     let distance = preferences.center ? milesBetween(preferences.center, row) : null;
     if (distance === null && preferences.zip) distance = this.db.prepare(`SELECT MIN(distance) d FROM area_inventory
@@ -85,14 +89,15 @@ export class AppData {
       city: row.city, state: row.state, postalCode: row.postal_code, phone: row.phone,
       latitude: row.latitude, longitude: row.longitude, coordinateSource: row.coordinate_source,
       distanceMiles: distance, favorite: Boolean(row.favorite), excluded: Boolean(row.excluded),
-      privateNote: row.private_note || '', publicNote: row.public_note || '', inventory };
+      privateNote: row.private_note || '', publicNote: row.public_note || '', inventory, timing,
+      travelEstimate: this.intelligence.travel(row.owner_id, row, preferences.zip) };
   }
 
   storeRows(discordId, id = null) {
-    return this.db.prepare(`SELECT s.*,p.favorite,p.excluded,p.private_note,n.note public_note FROM stores s
+    return this.db.prepare(`SELECT s.*,p.favorite,p.excluded,p.private_note,n.note public_note,? owner_id FROM stores s
       LEFT JOIN store_preferences p ON p.store_id=s.id AND p.discord_id=?
       LEFT JOIN public_notes n ON n.store_id=s.id WHERE (? IS NULL OR s.id=?) ORDER BY s.id`)
-      .all(discordId, id, id);
+      .all(discordId, discordId, id, id);
   }
 
   stores(discordId, { scope = 'nearby', after = '', limit = '200', favorites = 'false' } = {}) {
@@ -162,6 +167,40 @@ export class AppData {
     const health = this.db.prepare('SELECT MAX(last_success_at) success FROM monitor_jobs').get();
     const failing = this.db.prepare('SELECT COUNT(*) n FROM monitor_jobs WHERE last_error IS NOT NULL').get().n;
     return { enabled: this.config.monitor.enabled, activeSearches: this.jobs().size,
-      lastSuccessAt: iso(health.success), delayedSearches: failing, predictionsAvailable: false, remotePushAvailable: false };
+      lastSuccessAt: iso(health.success), delayedSearches: failing, predictionsAvailable: true, remotePushAvailable: false };
+  }
+
+  travelCandidates(discordId) {
+    const preferences = this.settings(discordId), covered = this.coverage();
+    if (!preferences.zip || !preferences.alerts.approaching || !this.config.monitor.enabled) return [];
+    return this.storeRows(discordId).filter(store => {
+      if (store.excluded || store.latitude === null || store.longitude === null || milesBetween(preferences.center, store) > 25) return false;
+      return preferences.products.some(upc => covered.has(`${store.id}:${upc}`));
+    }).map(store => ({ store, travel: this.intelligence.travel(discordId, store, preferences.zip),
+      pending: this.db.prepare("SELECT 1 FROM restock_batches WHERE store_id=? AND state='pending' LIMIT 1").get(store.id) ? 1 : 0 }))
+      .filter(item => !item.travel || this.clock() - Date.parse(item.travel.updatedAt) >= TRAVEL_REFRESH_AGE)
+      .sort((a, b) => b.pending - a.pending || (Date.parse(a.travel?.updatedAt) || 0) - (Date.parse(b.travel?.updatedAt) || 0) || a.store.id.localeCompare(b.store.id))
+      .slice(0, 250).map(({ store }) => ({ storeId: store.id, zip: preferences.zip,
+        origin: { latitude: preferences.center.latitude, longitude: preferences.center.longitude },
+        destination: { latitude: store.latitude, longitude: store.longitude } }));
+  }
+
+  saveTravel(discordId, id, input) {
+    const preferences = this.settings(discordId), store = this.storeRows(discordId, id)[0];
+    requireCondition(Object.keys(input).every(k => ['zip', 'latitude', 'longitude', 'seconds'].includes(k)) &&
+      typeof input.zip === 'string' && input.zip === preferences.zip &&
+      Number.isSafeInteger(input.seconds) && input.seconds >= 1 && input.seconds <= 14400 &&
+      typeof input.latitude === 'number' && typeof input.longitude === 'number',
+    400, 'INVALID_TRAVEL_ESTIMATE', 'Refresh the drive estimate from your current saved ZIP.');
+    const covered = this.coverage();
+    requireCondition(store && !store.excluded && store.latitude === input.latitude && store.longitude === input.longitude &&
+      milesBetween(preferences.center, store) <= 25 && preferences.products.some(upc => covered.has(`${id}:${upc}`)),
+    400, 'INVALID_TRAVEL_ESTIMATE', 'That store is no longer eligible for a drive estimate.');
+    // Client-reported estimates affect only this account, never the shared model.
+    this.db.prepare(`INSERT INTO travel_estimates (discord_id,store_id,zip,latitude,longitude,seconds,updated_at)
+      VALUES (?,?,?,?,?,?,?) ON CONFLICT(discord_id,store_id) DO UPDATE SET zip=excluded.zip,latitude=excluded.latitude,
+      longitude=excluded.longitude,seconds=excluded.seconds,updated_at=excluded.updated_at`)
+      .run(discordId, id, input.zip, input.latitude, input.longitude, input.seconds, this.clock());
+    return { saved: true };
   }
 }

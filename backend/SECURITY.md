@@ -4,7 +4,7 @@ This milestone provides an authenticated API, inventory worker, and native iPhon
 
 ## What stays on the server
 
-Discord's client secret and token exchange stay on the server. No Discord token is sent to the iPhone or stored in the database. The inventory worker keeps DG cookies, refreshed session credentials, inventory requests, and stock classification on the server. DG credentials are required only when monitoring is enabled. Future prediction logic will also remain server-side.
+Discord's client secret and token exchange stay on the server. No Discord token is sent to the iPhone or stored in the database. The inventory worker keeps DG cookies, refreshed session credentials, inventory requests, and stock classification on the server. DG credentials are required only when monitoring is enabled. Restock batch classification, business-hours timing, learned aggregates, forecasts, and departure-event generation all remain server-side.
 
 The Swift app uses the API base URL, its public app identifiers, an installation signing key, and its own session credentials. It must receive enough store data to display a map, so that returned data can still be observed or copied by an authorized user. Keeping the monitor off the phone protects its implementation and upstream credentials; it does not make screenshots, reverse engineering, or abuse of an authorized account impossible.
 
@@ -18,6 +18,7 @@ The Swift app uses the API base URL, its public app identifiers, an installation
 - Settings, private notes, favorites, exclusions, and inbox reads/updates use the authenticated account rather than a client-supplied user ID. Authorized members intentionally share stock observations and moderator notes across covered areas. Only configured moderator IDs can edit public notes. History and inbox queries are limited to seven days.
 - The API limits body size and request rates and returns sanitized errors. It does not log credentials, request bodies, or OAuth URLs. Rate-limit proxy headers are ignored unless explicitly trusted.
 - SQLite is stored outside the source tree on a persistent Railway volume in production. Production startup refuses an absent/mismatched configured mount. Transactions cover session changes, imports, and recovery invalidation.
+- Drive estimates are signed, validated against the current saved ZIP/store coordinates, timestamped by the server, and private to the authenticated account. A modified client can falsify its own drive duration, but cannot train the shared model or change another account's estimate. These inputs do not attest to a genuine Apple Maps result.
 - Backups use SQLite's online backup API. Prepared restore copies invalidate existing sessions and challenge codes to avoid reviving old tokens.
 
 ## One installation versus one physical iPhone
@@ -40,7 +41,7 @@ This design uses one Node process and one local SQLite database. Its in-memory r
 
 Back up before migrations, restrict infrastructure access, and retain a protected off-service copy. The database and backups are not encrypted by this application; storage-account controls and any platform encryption are separate responsibilities. Do not copy a lone live `.sqlite` file while ignoring its WAL. Never restore stale sessions directly from a raw backup.
 
-The authenticated profile, public key, settings, notes, favorites, latest stock snapshot, and cached geography persist until explicitly removed. Abandoned coverage stops polling and old stock is marked unknown. Inventory history and inbox events expire after seven days; audit events after 30 days; session token records after their session's expiry. Data export/account deletion and payment entitlement workflows belong to the later release preparation, not the present app controls.
+The authenticated profile, public key, settings, notes, favorites, latest stock snapshot, and cached geography persist until explicitly removed. Abandoned coverage stops polling and old stock is marked unknown. Inventory history, finished batch details, and inbox events expire after seven days; per-store timing aggregates persist separately; travel estimates are usable for 24 hours and pruned after seven days; audit events after 30 days; session token records after their session's expiry. Data export/account deletion and payment entitlement workflows belong to the later release preparation, not the present app controls.
 
 Infrastructure logging may capture request URLs even when this application does not. Redact OAuth callback query strings and Authorization headers and restrict log access. Never enable indiscriminate body or header logging to debug a real sign-in.
 

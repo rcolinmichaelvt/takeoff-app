@@ -3,7 +3,7 @@ import Foundation
 enum AppConfiguration {
     // Replace ONLY this URL with your Railway API's public HTTPS domain.
     // Do not add Discord secrets, DG cookies, or other server credentials here.
-    static let apiBaseURL = "https://YOUR-BACKEND.up.railway.app"
+    static let apiBaseURL = "https://takeoff-app-production-966b.up.railway.app"
 
     static func validatedURL() throws -> URL {
         guard var parts = URLComponents(string: apiBaseURL), parts.scheme == "https",

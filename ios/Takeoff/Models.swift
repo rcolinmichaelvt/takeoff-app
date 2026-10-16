@@ -85,6 +85,7 @@ enum ShelfStatus: String, Codable, CaseIterable {
 struct StockItem: Decodable, Identifiable {
     let upc: String; let title: String; let quantity: Int; let status: ShelfStatus; let stale: Bool
     let observedAt: Date; let lastIncreaseAt: Date?; let lastDecreaseAt: Date?
+    var forecast: RestockForecast? = nil
     var id: String { upc }
     func effectiveStatus(at date: Date = Date()) -> ShelfStatus {
         stale || date.timeIntervalSince(observedAt) > 9 * 60 ? .unknown : status
@@ -102,6 +103,8 @@ struct Store: Decodable, Identifiable {
     let postalCode: String?; let phone: String?; let latitude: Double?; let longitude: Double?; let coordinateSource: String?
     let distanceMiles: Double?; var favorite: Bool; var excluded: Bool; var privateNote: String; var publicNote: String
     let inventory: [StockItem]
+    var timing: StoreTiming? = nil
+    var travelEstimate: TravelEstimate? = nil
     var coordinate: CLLocationCoordinate2D? {
         guard let latitude, let longitude, abs(latitude) <= 90, abs(longitude) <= 180 else { return nil }
         return .init(latitude: latitude, longitude: longitude)
@@ -125,11 +128,56 @@ struct HistoryEntry: Decodable, Identifiable {
 }
 struct HistoryPage: Decodable { let history: [HistoryEntry]; let nextCursor: Int? }
 struct InboxEvent: Decodable, Identifiable {
-    struct Payload: Decodable { let storeId: String?; let title: String?; let body: String?; let notificationsPaused: Bool? }
+    struct Payload: Decodable {
+        let storeId: String?; let title: String?; let body: String?; let notificationsPaused: Bool?
+        let address: String?; let predictedAt: Date?
+    }
     let id: Int; let kind: String; let payload: Payload; let createdAt: Date; var readAt: Date?
     var title: String { payload.title ?? kind.replacingOccurrences(of: "_", with: " ").capitalized }
 }
 struct InboxPage: Decodable { let events: [InboxEvent]; let nextCursor: Int? }
+
+struct RestockForecast: Decodable {
+    let batchId: Int; let startedAt: Date; let pendingQuantity: Int; let expectedAt: Date?
+    let confidence: String; let sampleCount: Int; let state: String; let reason: String?
+    var explanation: String {
+        switch reason {
+        case "overlapping_deliveries": return "More stock arrived before the previous batch started selling. Timing is uncertain."
+        case "unknown_prior_stock": return "Earlier stock was already present when monitoring began. Timing is uncertain."
+        case "hours_changed": return "Store hours changed during this restock. A new timing sample is needed."
+        case "hours_unavailable", "hours_unavailable_at_arrival": return "Waiting for reliable opening hours before estimating this restock."
+        case "old_samples": return "Recent restock samples are needed before estimating this delivery."
+        default: return "Learning this store's timing from new stock to its first qualifying sale."
+        }
+    }
+}
+struct StoreTiming: Decodable {
+    struct Pattern: Decodable, Identifiable {
+        let weekday: Int; let day: String; let samples: Int; let averageOpenMinutes: Double
+        var id: Int { weekday }
+    }
+    struct OpeningHours: Decodable {
+        struct Day: Decodable, Identifiable { let day: String; let hours: String; var id: String { day } }
+        let timezone: String; let updatedAt: Date; let days: [Day]
+    }
+    let sampleCount: Int; let averageOpenMinutes: Double?; let spreadOpenMinutes: Double?
+    let confidence: String; let lastSampleAt: Date?; let hoursStatus: String
+    let openingHours: OpeningHours?; let patterns: [Pattern]
+    static func duration(_ minutes: Double) -> String {
+        let value = max(1, Int(minutes.rounded()))
+        return value < 60 ? "\(value) min" : "\(value / 60) hr \(value % 60) min"
+    }
+}
+struct TravelEstimate: Decodable { let seconds: Int; let updatedAt: Date; let source: String }
+struct TravelCandidate: Decodable {
+    struct Point: Decodable {
+        let latitude: Double; let longitude: Double
+        var coordinate: CLLocationCoordinate2D { .init(latitude: latitude, longitude: longitude) }
+    }
+    let storeId: String; let zip: String; let origin: Point; let destination: Point
+}
+struct TravelCandidates: Decodable { let candidates: [TravelCandidate] }
+struct TravelUpdate: Encodable { let zip: String; let latitude: Double; let longitude: Double; let seconds: Int }
 
 enum APIJSON {
     static func decoder() -> JSONDecoder {

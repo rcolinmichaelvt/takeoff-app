@@ -1,4 +1,4 @@
-export const latestSchemaVersion = 2;
+export const latestSchemaVersion = 3;
 
 export const migration2 = `
 CREATE TABLE zip_regions (
@@ -84,4 +84,53 @@ CREATE TABLE monitor_jobs (
   PRIMARY KEY(zip,upc)
 ) STRICT;
 PRAGMA user_version = 2;
+`;
+
+export const migration3 = `
+CREATE TABLE store_hours (
+  store_id TEXT PRIMARY KEY REFERENCES stores(id),
+  schedule_json TEXT,
+  updated_at INTEGER,
+  next_fetch_at INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT
+) STRICT;
+CREATE TABLE restock_batches (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  store_id TEXT NOT NULL REFERENCES stores(id),
+  upc TEXT NOT NULL,
+  quantity INTEGER NOT NULL,
+  started_at INTEGER NOT NULL,
+  ended_at INTEGER,
+  state TEXT NOT NULL CHECK(state IN ('pending','selling','uncertain')),
+  reason TEXT,
+  schedule_json TEXT,
+  open_minutes REAL
+) STRICT;
+CREATE UNIQUE INDEX one_pending_batch ON restock_batches(store_id,upc) WHERE state='pending';
+CREATE TABLE store_timing (
+  store_id TEXT NOT NULL REFERENCES stores(id),
+  weekday INTEGER NOT NULL CHECK(weekday BETWEEN 1 AND 7),
+  samples INTEGER NOT NULL,
+  total_minutes REAL NOT NULL,
+  squared_minutes REAL NOT NULL,
+  last_sample_at INTEGER NOT NULL,
+  PRIMARY KEY(store_id,weekday)
+) STRICT;
+CREATE TABLE travel_estimates (
+  discord_id TEXT NOT NULL REFERENCES users(discord_id),
+  store_id TEXT NOT NULL REFERENCES stores(id),
+  zip TEXT NOT NULL REFERENCES zip_regions(zip),
+  latitude REAL NOT NULL,
+  longitude REAL NOT NULL,
+  seconds INTEGER NOT NULL CHECK(seconds BETWEEN 1 AND 14400),
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY(discord_id,store_id)
+) STRICT;
+CREATE TABLE approaching_sent (
+  batch_id INTEGER NOT NULL REFERENCES restock_batches(id) ON DELETE CASCADE,
+  discord_id TEXT NOT NULL REFERENCES users(discord_id),
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY(batch_id,discord_id)
+) STRICT;
+PRAGMA user_version = 3;
 `;

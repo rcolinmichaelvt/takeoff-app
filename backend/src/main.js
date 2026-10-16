@@ -40,11 +40,11 @@ try {
     process.exitCode = 1;
   });
   server.listen(config.port, config.host, () => {
-    console.log(`Takeoff API v0.2 listening on port ${config.port}.`);
+    console.log(`Takeoff API v0.3 listening on port ${config.port}.`);
     if (!config.allowedIds.size) console.log('Discord allowlist is empty: all account access is denied.');
     monitor.start();
     console.log(config.monitor.enabled ? 'DG monitoring enabled for subscribed ZIP/product pairs.' : 'DG monitoring disabled. Configure server credentials and DG_MONITOR_ENABLED when ready.');
-    console.log('Predictions and APNs delivery are not enabled in this milestone.');
+    console.log('Store-hours learning and departure inbox events enabled. APNs delivery is not enabled.');
   });
 } catch (error) {
   console.error(`Startup failed: ${error.message}`);

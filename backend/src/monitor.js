@@ -1,10 +1,12 @@
 import { Inventory } from './inventory.js';
 import { milesBetween } from './geography.js';
+import { DAY, normalizeHours } from './hours.js';
 
 export function createMonitor({ db, config, appData, provider, geography, clock = Date.now, logger = console }) {
   const inventory = new Inventory({ db, config, appData, clock });
   const controller = new AbortController();
   let timer, running, geocodeTimer, geocoding, stopped = false, started = false, pauseUntil = 0, geocodeAfter = 0;
+  let hoursTimer, hoursRunning, predictionTimer, requestAfter = 0;
   const reconcile = () => {
     const active = appData.jobs();
     const add = db.prepare('INSERT INTO monitor_jobs (zip,upc,next_poll_at) VALUES (?,?,?) ON CONFLICT(zip,upc) DO NOTHING');
@@ -17,9 +19,10 @@ export function createMonitor({ db, config, appData, provider, geography, clock 
   const tick = async () => {
     if (!config.monitor.enabled || stopped) return;
     const active = reconcile();
-    if (clock() < pauseUntil || !active.size) return;
+    if (clock() < Math.max(pauseUntil, requestAfter) || !active.size) return;
     const due = db.prepare('SELECT * FROM monitor_jobs WHERE next_poll_at<=? ORDER BY next_poll_at,zip,upc LIMIT 1').get(clock());
     if (due) {
+      requestAfter = clock() + config.monitor.minRequestGapMs;
       const job = active.get(`${due.zip}:${due.upc}`);
       try {
         const stores = await provider.fetchInventory(job, job.upc);
@@ -42,6 +45,35 @@ export function createMonitor({ db, config, appData, provider, geography, clock 
       }
     }
   };
+  const hoursTick = async () => {
+    if (stopped || !config.monitor.enabled || !provider.fetchStoreInfo || clock() < Math.max(pauseUntil, requestAfter)) return;
+    const active = appData.jobs();
+    const store = db.prepare(`SELECT s.* FROM stores s LEFT JOIN store_hours h ON h.store_id=s.id
+      WHERE COALESCE(h.next_fetch_at,0)<=? ORDER BY COALESCE(h.next_fetch_at,0),s.id`).all(clock()).find(row =>
+      db.prepare('SELECT zip,upc FROM area_inventory WHERE store_id=?').all(row.id).some(a => active.has(`${a.zip}:${a.upc}`)));
+    if (!store) return;
+    requestAfter = clock() + config.monitor.minRequestGapMs;
+    db.prepare(`INSERT INTO store_hours (store_id,next_fetch_at) VALUES (?,?) ON CONFLICT(store_id)
+      DO UPDATE SET next_fetch_at=excluded.next_fetch_at`).run(store.id, clock() + 6 * 60 * 60_000);
+    try {
+      const info = await provider.fetchStoreInfo(store.id);
+      if (stopped) return;
+      const stillActive = appData.jobs();
+      if (!db.prepare('SELECT zip,upc FROM area_inventory WHERE store_id=?').all(store.id).some(a => stillActive.has(`${a.zip}:${a.upc}`))) return;
+      const location = db.prepare('SELECT latitude,longitude FROM stores WHERE id=?').get(store.id);
+      const schedule = normalizeHours(info, location);
+      db.prepare('UPDATE store_hours SET schedule_json=?,updated_at=?,last_error=?,next_fetch_at=? WHERE store_id=?')
+        .run(schedule ? JSON.stringify(schedule) : null, schedule ? clock() : null,
+          schedule ? null : 'STORE_HOURS_UNRECOGNIZED', clock() + (schedule ? DAY : 6 * 60 * 60_000), store.id);
+      if (!schedule) logger.warn({ code: 'STORE_HOURS_UNRECOGNIZED', storeId: store.id });
+    } catch (error) {
+      const code = ['DG_RATE_LIMITED', 'DG_AUTH_REQUIRED'].includes(error.code) ? error.code : 'STORE_HOURS_UNAVAILABLE';
+      db.prepare('UPDATE store_hours SET last_error=? WHERE store_id=?').run(code, store.id);
+      if (code === 'DG_RATE_LIMITED' || code === 'DG_AUTH_REQUIRED') pauseUntil = Math.max(pauseUntil, clock() + (error.retryMs || 60_000));
+      logger.warn({ code, storeId: store.id });
+    }
+  };
+  const predictionTick = () => { if (!stopped) appData.intelligence.sweep(appData); };
   const geocodeTick = async () => {
     if (!config.monitor.enabled || stopped || !config.monitor.geocodeStores || clock() < geocodeAfter) return;
     const active = appData.jobs();
@@ -81,17 +113,29 @@ export function createMonitor({ db, config, appData, provider, geography, clock 
     finally { geocoding = undefined; }
     if (!stopped) { geocodeTimer = setTimeout(geocodeLoop, 10_000); geocodeTimer.unref(); }
   };
-  return { tick, geocodeTick, reconcile, inventory,
+  const hoursLoop = async () => {
+    if (stopped) return;
+    hoursRunning = hoursTick();
+    try { await hoursRunning; } catch { logger.warn({ code: 'STORE_HOURS_TICK_FAILED' }); }
+    finally { hoursRunning = undefined; }
+    if (!stopped) { hoursTimer = setTimeout(hoursLoop, 15_000); hoursTimer.unref(); }
+  };
+  return { tick, geocodeTick, hoursTick, predictionTick, reconcile, inventory,
     start() {
       if (config.monitor.enabled && !started && !stopped) {
         started = true;
         timer = setTimeout(loop, 0); timer.unref();
         if (config.monitor.geocodeStores) { geocodeTimer = setTimeout(geocodeLoop, 0); geocodeTimer.unref(); }
+        hoursTimer = setTimeout(hoursLoop, 2000); hoursTimer.unref();
+        predictionTimer = setInterval(() => {
+          try { predictionTick(); } catch { logger.warn({ code: 'PREDICTION_TICK_FAILED' }); }
+        }, 15_000); predictionTimer.unref();
       }
     },
     async stop() {
-      stopped = true; clearTimeout(timer); clearTimeout(geocodeTimer); controller.abort(); provider.close?.();
-      await Promise.allSettled([running, geocoding].filter(Boolean));
+      stopped = true; clearTimeout(timer); clearTimeout(geocodeTimer); clearTimeout(hoursTimer); clearInterval(predictionTimer);
+      controller.abort(); provider.close?.();
+      await Promise.allSettled([running, geocoding, hoursRunning].filter(Boolean));
     },
   };
 }

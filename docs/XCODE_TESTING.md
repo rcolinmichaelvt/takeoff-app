@@ -1,12 +1,12 @@
 # Run Takeoff on your iPhone with Xcode
 
-Milestone 2 includes a real SwiftUI project at `ios/Takeoff.xcodeproj`. Open that project directly. The app targets **iPhone, iOS 17.0 or later**, uses Swift 5 language mode, and has no external Swift packages. Your reported iPhone on iOS 26.2 meets the deployment target. Xcode still needs the appropriate device support installed locally.
+Takeoff includes a real SwiftUI project at `ios/Takeoff.xcodeproj`. Open that project directly. The app targets **iPhone, iOS 17.0 or later**, uses Swift 5 language mode, and has no external Swift packages. Your reported iPhone on iOS 26.2 meets the deployment target. Xcode still needs the appropriate device support installed locally.
 
-The source and project structure were checked in a Linux workspace. **An Xcode build and on-device run have not been performed here.** The included four XCTest cases are ready to run on your Mac.
+The source and project structure were checked in a Linux workspace. **An Xcode build and on-device run have not been performed here.** The included six XCTest cases are ready to run on your Mac.
 
 ## 1. Upgrade your existing Railway backend first
 
-Follow [MILESTONE_2_UPGRADE.md](MILESTONE_2_UPGRADE.md). Your existing Milestone 1 service needs the new settings, store, note, and inventory endpoints. Keep the same service URL and persistent `/data` volume.
+Follow [MILESTONE_3_UPGRADE.md](MILESTONE_3_UPGRADE.md) when updating the working Milestone 2 app. Keep the existing project/signing configuration; the update only changes already-included Swift files. A fresh setup also needs the settings, store, note, inventory, and travel endpoints. Keep the same service URL and persistent `/data` volume.
 
 You can test Discord sign-in and save a ZIP before enabling DG monitoring. An empty map is expected until the worker has valid DG credentials and at least one member has saved a ZIP and selected products.
 
@@ -64,8 +64,8 @@ Official references: [running on a device](https://developer.apple.com/documenta
 1. Tap **Continue with Discord**, approve the browser prompt, and sign in using the account on your server allowlist.
 2. Enter one five-digit US ZIP, or tap **Use current location for ZIP**. Location fills the field once; press Save/Start to commit it. Traveling later will not move your monitoring area.
 3. Select your products from the curated catalog and tap **Start exploring**. Selecting no products creates no monitoring work for your account.
-4. Open **Discover**. Use the list/map toggle, item filter, and **Your 25 miles / All covered areas** control. The app refreshes approximately every 30 seconds while active; you can refresh manually.
-5. Tap a store. Check product quantities and observation times, favorite/exclude it, and save a private note. Moderators can separately save a public note. Drive estimates are requested on demand from your saved ZIP's center and can be unavailable.
+4. Open **Discover**. Use the list/map toggle, item filter, and **Your area / All covered areas** control. The app refreshes approximately every 30 seconds while active; you can refresh manually.
+5. Tap a store. Check product quantities and observation times, favorite/exclude it, and save a private note. Moderators can separately save a public note. Drive estimates are requested from your saved ZIP's center, on demand and gradually during foreground refresh. They can be unavailable. Store details also show opening-hours timing, confidence, and forecasts as clean samples accumulate.
 6. Open **Inbox** for changes selected by your alert preferences from the last seven days. In **Settings → Alerts & pause**, choose event types or pause notifications. Paused events remain in the inbox.
 
 A green pin means at least one filtered product is likely for sale; yellow means back stock when no filtered product is green; gray means uncertain data when neither green nor yellow applies; red means all observed filtered products are sold out. The store detail shows each observed product separately. Initial positive observations are gray until enough changes are observed. Observations older than nine minutes, or without an active subscription covering them, also show unknown.
@@ -74,12 +74,14 @@ The server uses DG coordinates if supplied. Otherwise it resolves public store a
 
 ## 6. Run the included iOS checks
 
-Choose an installed **iPhone simulator** as the destination, keep the **Takeoff** scheme selected, then press **Command-U**. The four tests cover:
+Choose an installed **iPhone simulator** as the destination, keep the **Takeoff** scheme selected, then press **Command-U**. The six tests cover:
 
 - Exact request-signing bytes and verification of a Node-generated P-256 DER signature.
 - Callback origin/state validation and rejection of duplicate login codes.
 - Stale stock losing its sale claim while retaining the last observed quantity.
 - Partial preference updates omitting unrelated fields.
+- New prediction payloads decoding without changing observed shelf status.
+- Older inbox payloads without address/prediction fields remaining readable.
 
 These tests do not sign in or contact Railway. A simulator is a **different installation** if you later sign into it. Moving the same Discord account between your phone and a simulator invokes the six-hour transfer rule. The simulator uses a development-only software signing key; physical phones use Secure Enclave. For normal development, test the UI signed in on one installation at a time.
 
@@ -109,7 +111,7 @@ Sources: [Apple developer account overview](https://developer.apple.com/help/acc
 | Bundle identifier unavailable | Choose a unique bundle identifier and let automatic signing refresh. |
 | Project opens but no files/build target appear | Open the supplied `.xcodeproj`; preserve the sibling source/test directories. Avoid dragging duplicate copies into a blank project. |
 | “Set your Railway HTTPS URL” | Replace the placeholder in `Takeoff/AppConfiguration.swift`, then build again. |
-| Server response does not match this app / endpoint missing | Deploy all Milestone 2 backend files to the API service, then retry. A healthy Milestone 1 API still lacks the new endpoints. |
+| Server response does not match this app / endpoint missing | Deploy the Milestone 3 backend update to the API service, then retry. A healthy older API can still lack the new endpoints. |
 | Discord invalid redirect | Match the exact HTTPS callback in Discord to Railway's `PUBLIC_BASE_URL`. |
 | Discord access denied | Check the numeric user ID and the signed-in Discord account; apply the Railway allowlist change. |
 | Invalid or expired sign-in code | Restart sign-in and complete the device-transfer prompt within two minutes. |

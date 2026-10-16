@@ -19,7 +19,7 @@ struct AreaSettingsView: View {
                 }.disabled(location.busy)
                 if let error = location.error { Text(error).font(.footnote).foregroundStyle(.secondary) }
             } header: { Text("Your area") } footer: {
-                Text("Takeoff monitors a fixed 25-mile radius around this ZIP. Using your location only fills in the ZIP; it does not follow you as you travel.")
+                Text("Takeoff monitors stores around your saved ZIP. Using your location only fills in the ZIP; it does not follow you as you travel.")
             }
             Section {
                 HStack {
@@ -75,7 +75,6 @@ struct SettingsView: View {
                 if let member = model.member {
                     Section("Your account") {
                         Label(member.displayName, systemImage: "person.crop.circle")
-                        LabeledContent("Discord ID", value: member.discordId).font(.caption)
                         LabeledContent("Access", value: member.isModerator ? "Moderator" : "Member")
                         Text("One installation at a time. Moving access revokes the previous installation and starts a six-hour transfer cooldown.")
                             .font(.footnote).foregroundStyle(.secondary)
@@ -88,7 +87,6 @@ struct SettingsView: View {
                     NavigationLink("Alerts & pause") { AlertSettingsView() }
                 }
                 Section("Monitoring") {
-                    LabeledContent("Radius", value: "25 miles")
                     if let status = model.monitoring {
                         LabeledContent("Server", value: status.enabled ? "Enabled" : "Not enabled")
                         LabeledContent("Shared searches", value: String(status.activeSearches))
@@ -97,7 +95,7 @@ struct SettingsView: View {
                         }
                         if status.delayedSearches > 0 { Text("Some searches are delayed. Older observations are shown as unknown.").font(.footnote).foregroundStyle(.secondary) }
                     }
-                    Text("This build refreshes while open and retrieves missed alerts when you return. Phone push delivery, restock predictions, and multi-store routes are coming in later milestones.")
+                    Text("This build refreshes while open and retrieves missed alerts when you return. Store predictions improve as clean restocks are observed. Phone push delivery and multi-store routes are coming later.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 Section { Button("Sign out", role: .destructive) { confirmLogout = true }.disabled(model.busy) }
@@ -127,8 +125,8 @@ struct AlertSettingsView: View {
             }
             Section {
                 Toggle("Approaching predicted restock", isOn: $alerts.approaching)
-            } header: { Text("Saved for the next milestone") } footer: {
-                Text("Prediction alerts will use the saved ZIP's driving time and a five-minute warning. They are not generated yet.")
+            } header: { Text("Restock predictions") } footer: {
+                Text("A departure warning uses the predicted shelf time minus your saved ZIP's drive estimate minus five minutes. At least three consistent samples and a recent drive estimate are needed. While this app is open, Apple Maps drive estimates are saved for up to 24 hours. These warnings appear in your inbox; phone pushes are not enabled yet.")
             }
             Button("Save alert preferences") {
                 Task { if await model.savePreferences(alerts: alerts) { dismiss() } }

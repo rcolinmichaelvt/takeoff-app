@@ -4,6 +4,7 @@ import { once } from 'node:events';
 import { createServer, clientIp } from '../src/server.js';
 import { fixture, device, login, signedRequest, ALICE, BOB } from './helpers.js';
 import { randomToken, challengeFor } from '../src/crypto.js';
+import { Inventory } from '../src/inventory.js';
 
 async function httpFixture(t) {
   const f = fixture(t);
@@ -26,6 +27,35 @@ async function httpFixture(t) {
   };
   return { ...f, base, errors, appData };
 }
+
+test('signed travel endpoints isolate accounts and reject injected owners, changed ZIPs, and copied tokens', async t => {
+  const f = await httpFixture(t), alice = device(), bob = device();
+  const aliceTokens = await login(f, alice), bobTokens = await login(f, bob, BOB);
+  f.config.monitor.enabled = true;
+  f.db.prepare('INSERT INTO zip_regions VALUES (?,?,?,?,?)').run('24060', 37.23, -80.42, 'Blacksburg, VA', f.clock());
+  for (const id of [ALICE, BOB]) await f.appData.saveSettings(id, { zip: '24060', products: ['196214158801'] });
+  const inventory = new Inventory(f);
+  inventory.ingest(f.appData.jobs().values().next().value, [{ id: '100', quantity: 0, address: '100 Test Street',
+    city: 'Blacksburg', state: 'VA', latitude: 37.23, longitude: -80.42, distance: 0 }]);
+  const needed = '/v1/travel-estimates/needed', endpoint = '/v1/travel-estimates/100';
+  assert.equal((await f.get(needed)).status, 401);
+  assert.equal((await f.request(device(), aliceTokens.accessToken, needed)).status, 401);
+  const candidates = await (await f.request(alice, aliceTokens.accessToken, needed)).json();
+  assert.equal(candidates.candidates[0].zip, '24060');
+  const input = { zip: '24060', latitude: 37.23, longitude: -80.42, seconds: 1200 };
+  assert.equal((await f.request(alice, aliceTokens.accessToken, endpoint, input, 'PUT')).status, 200);
+  assert.equal((await f.request(alice, aliceTokens.accessToken, endpoint, { ...input, discordId: BOB }, 'PUT')).status, 400);
+  assert.equal((await f.request(alice, aliceTokens.accessToken, endpoint, { ...input, zip: '00000' }, 'PUT')).status, 400);
+  const aliceStore = await (await f.request(alice, aliceTokens.accessToken, '/v1/stores/100')).json();
+  const bobStore = await (await f.request(bob, bobTokens.accessToken, '/v1/stores/100')).json();
+  assert.equal(aliceStore.travelEstimate.seconds, 1200); assert.equal(bobStore.travelEstimate, null);
+  f.db.prepare('INSERT INTO events (discord_id,kind,payload_json,created_at) VALUES (?,?,?,?)')
+    .run(ALICE, 'stock_increase', JSON.stringify({ storeId: '100', body: 'Dollar General #100: 0 → 12.' }), f.clock());
+  const inbox = await (await f.request(alice, aliceTokens.accessToken, '/v1/events')).json();
+  assert.equal(inbox.events[0].payload.address, '100 Test Street, Blacksburg, VA');
+  assert.equal(inbox.events[0].payload.body, '0 → 12.');
+  assert.equal(f.errors.length, 0);
+});
 
 test('HTTP OAuth round trip returns a bound session and never redirects tokens to the app', async t => {
   const f = await httpFixture(t), dev = device(), verifier = randomToken();

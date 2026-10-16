@@ -48,4 +48,20 @@ final class ProtocolTests: XCTestCase {
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: APIJSON.encoder().encode(update)) as? [String: Any])
         XCTAssertEqual(Set(object.keys), ["alerts"])
     }
+
+    func testPredictionDecodesWithoutChangingTheObservedShelfStatus() throws {
+        let json = #"{"upc":"196214158801","title":"Test item","quantity":12,"status":"back","stale":false,"observedAt":"2026-10-13T18:05:00.000Z","lastIncreaseAt":"2026-10-13T17:00:00Z","lastDecreaseAt":null,"forecast":{"batchId":1,"startedAt":"2026-10-13T17:00:00Z","pendingQuantity":12,"expectedAt":"2026-10-13T18:00:00Z","confidence":"medium","sampleCount":3,"state":"expected_unconfirmed","reason":null}}"#
+        let stock = try APIJSON.decoder().decode(StockItem.self, from: Data(json.utf8))
+        XCTAssertEqual(stock.effectiveStatus(at: stock.observedAt), .back)
+        XCTAssertEqual(stock.forecast?.sampleCount, 3)
+        XCTAssertEqual(stock.forecast?.state, "expected_unconfirmed")
+        XCTAssertEqual(stock.effectiveStatus(at: stock.observedAt.addingTimeInterval(600)), .unknown)
+    }
+
+    func testInboxAddressAndPredictionAreOptionalForOlderEvents() throws {
+        let old = #"{"id":1,"kind":"sold_out","payload":{"storeId":"100","title":"Sold out","body":"2 → 0."},"createdAt":"2026-10-13T18:00:00Z","readAt":null}"#
+        let event = try APIJSON.decoder().decode(InboxEvent.self, from: Data(old.utf8))
+        XCTAssertNil(event.payload.address)
+        XCTAssertNil(event.payload.predictedAt)
+    }
 }

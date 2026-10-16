@@ -19,7 +19,12 @@ struct InboxView: View {
                                 Circle().fill(event.readAt == nil ? Theme.purple : .clear).frame(width: 8, height: 8).padding(.top, 6)
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(event.title).font(.headline).foregroundStyle(.primary)
+                                    if let address = event.payload.address { Text(address).font(.subheadline.weight(.medium)).foregroundStyle(.primary) }
                                     if let body = event.payload.body { Text(body).font(.subheadline).foregroundStyle(.secondary) }
+                                    if let predicted = event.payload.predictedAt {
+                                        Text("Estimated shelf time: \(predicted, format: .dateTime.month().day().hour().minute())")
+                                            .font(.caption).foregroundStyle(.secondary)
+                                    }
                                     HStack {
                                         Text(event.createdAt, style: .relative)
                                         if event.payload.notificationsPaused == true { Text("· Paused at the time") }

@@ -28,6 +28,9 @@ struct StoreDetailView: View {
                             HStack(spacing: 18) {
                                 if let miles = store.distanceMiles { Label(String(format: "%.1f mi", miles), systemImage: "location") }
                                 if let eta { Label(eta, systemImage: "car.fill") }
+                                else if let travel = store.travelEstimate {
+                                    Label("~\(max(1, Int(ceil(Double(travel.seconds) / 60)))) min", systemImage: "car.fill")
+                                }
                                 if etaBusy { ProgressView() }
                             }.font(.subheadline)
                             if let phone = store.phone, let url = phoneURL(phone) { Link(destination: url) { Label(phone, systemImage: "phone") } }
@@ -49,6 +52,9 @@ struct StoreDetailView: View {
                     Section("Products at this store") {
                         if store.inventory.isEmpty { Text("No product observations yet.").foregroundStyle(.secondary) }
                         ForEach(store.inventory) { stock in StockRow(stock: stock) }
+                    }.environment(\.timeZone, TimeZone(identifier: store.timing?.openingHours?.timezone ?? "") ?? .current)
+                    if let timing = store.timing {
+                        RestockTimingSection(timing: timing, travel: store.travelEstimate)
                     }
                     Section {
                         if !store.publicNote.isEmpty { Text(store.publicNote).textSelection(.enabled) }
@@ -141,13 +147,20 @@ struct StoreDetailView: View {
         mapItem(store)?.openInMaps()
     }
     private func calculateETA(_ store: Store) async {
-        guard !etaBusy, let center = model.preferences.center, let destination = mapItem(store) else { return }
+        guard !etaBusy, let center = model.preferences.center, let zip = model.preferences.zip, let destination = mapItem(store) else { return }
         etaBusy = true; defer { etaBusy = false }
         let request = MKDirections.Request()
         request.source = MKMapItem(placemark: MKPlacemark(coordinate: center.coordinate))
         request.destination = destination; request.transportType = .automobile; request.departureDate = Date()
         let search = MKDirections(request: request); directions = search
-        do { let result = try await search.calculateETA(); eta = "\(max(1, Int(ceil(result.expectedTravelTime / 60)))) min" }
+        do {
+            let result = try await search.calculateETA()
+            try Task.checkCancellation()
+            guard zip == model.preferences.zip, result.expectedTravelTime.isFinite,
+                  result.expectedTravelTime > 0, result.expectedTravelTime <= 14400 else { return }
+            eta = "\(max(1, Int(ceil(result.expectedTravelTime / 60)))) min"
+            await model.saveDriveEstimate(store, zip: zip, seconds: Int(ceil(result.expectedTravelTime)))
+        }
         catch { if !Task.isCancelled { self.error = "Driving time is unavailable right now. You can try again later." } }
         directions = nil
     }
@@ -160,9 +173,68 @@ private struct StockRow: View {
             HStack(alignment: .top) { Text(stock.title).font(.headline); Spacer(); Text("\(stock.quantity)").font(.title2.bold().monospacedDigit()) }
             StockBadge(status: stock.effectiveStatus())
             Text(stock.explanation).font(.caption).foregroundStyle(.secondary)
+            if stock.effectiveStatus() != .unknown, let forecast = stock.forecast {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("\(forecast.pendingQuantity) newly scanned units remain unconfirmed").font(.caption.weight(.semibold))
+                    if let expected = forecast.expectedAt {
+                        Text(expected <= Date() ? "Expected ready—unconfirmed" : "Estimated shelf time")
+                            .font(.subheadline.weight(.medium))
+                        Text(expected, format: .dateTime.month().day().hour().minute()).font(.subheadline)
+                        Text("\(forecast.confidence.capitalized) confidence · \(forecast.sampleCount) samples").font(.caption)
+                    } else { Text(forecast.explanation).font(.caption) }
+                }.foregroundStyle(.secondary)
+            }
             Text("Checked \(stock.observedAt, format: .dateTime.month().day().hour().minute())").font(.caption2).foregroundStyle(.secondary)
             if let increase = stock.lastIncreaseAt { Text("Last increase: \(increase, format: .dateTime.month().day().hour().minute())").font(.caption2).foregroundStyle(.secondary) }
             if let decrease = stock.lastDecreaseAt { Text("Last decrease: \(decrease, format: .dateTime.month().day().hour().minute())").font(.caption2).foregroundStyle(.secondary) }
         }.padding(.vertical, 8)
+    }
+}
+
+private struct RestockTimingSection: View {
+    let timing: StoreTiming
+    let travel: TravelEstimate?
+    var body: some View {
+        Section {
+            if let average = timing.averageOpenMinutes {
+                LabeledContent("Average open time", value: StoreTiming.duration(average))
+                LabeledContent("Confidence", value: timing.confidence.capitalized)
+                Text("\(timing.sampleCount) clean stock-to-sale samples across this store's products.").font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text("Learning this store's restock timing").font(.subheadline.weight(.medium))
+                Text("A sample starts with new stock and ends when that new stock first sells. Older stock selling does not end the timer.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if timing.hoursStatus != "ready" {
+                Text("Opening hours are unavailable or outdated. Predictions are paused for this store.").font(.caption).foregroundStyle(.secondary)
+            }
+            if !timing.patterns.isEmpty {
+                DisclosureGroup("Observed arrival days") {
+                    ForEach(timing.patterns) { pattern in
+                        LabeledContent(pattern.day, value: "\(pattern.samples) · \(StoreTiming.duration(pattern.averageOpenMinutes)) avg")
+                            .font(.caption)
+                    }
+                    Text("Counts reflect observed product batches with a clean first sale. Several products can arrive on one truck.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            if let hours = timing.openingHours {
+                DisclosureGroup("Regular store hours") {
+                    ForEach(hours.days) { day in LabeledContent(day.day.capitalized, value: day.hours).font(.caption) }
+                    Text("Store timezone: \(hours.timezone)").font(.caption).foregroundStyle(.secondary)
+                    Text("Updated \(hours.updatedAt, style: .relative) ago. Published date exceptions are used by predictions.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            if let travel {
+                Text("Departure warnings use a saved Apple Maps drive estimate, checked \(travel.updatedAt, style: .relative) ago.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text("A recent drive estimate from your saved ZIP is needed for departure warnings.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        } header: { Text("Restock timing") } footer: {
+            Text("Only opening hours count. Estimates do not confirm shelf availability. Product prediction times use the store's timezone.")
+        }
     }
 }

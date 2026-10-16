@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import AuthenticationServices
 import UIKit
+import MapKit
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -29,6 +30,10 @@ final class AppModel: ObservableObject {
     private let webSignIn = WebSignIn()
     private var initialized = false
     private var revision = 0
+    private var driveRequest: MKDirections?
+    private var refreshingDrive = false
+    private var driveRetryAfter: [String: Date] = [:]
+    private var nextDriveRequest = Date.distantPast
 
     func bootstrap() async {
         guard !initialized else { return }; initialized = true
@@ -177,12 +182,58 @@ final class AppModel: ObservableObject {
             if let index = events.firstIndex(where: { $0.id == event.id }) { events[index].readAt = Date() }
         } catch { await report(error) }
     }
+    func refreshDriveEstimate() async {
+        guard phase == .signedIn, member?.capabilities.monitoring == true, preferences.alerts.approaching,
+              !refreshingDrive, Date() >= nextDriveRequest, UIApplication.shared.applicationState == .active else { return }
+        refreshingDrive = true; defer { refreshingDrive = false; driveRequest = nil }
+        do {
+            let api = try client()
+            let page: TravelCandidates = try await api.get("/v1/travel-estimates/needed")
+            try Task.checkCancellation()
+            guard let candidate = page.candidates.first(where: {
+                $0.zip == preferences.zip && Date() >= (driveRetryAfter["\($0.zip):\($0.storeId)"] ?? .distantPast)
+            }), phase == .signedIn, UIApplication.shared.applicationState == .active else { return }
+            let key = "\(candidate.zip):\(candidate.storeId)"
+            driveRetryAfter[key] = Date().addingTimeInterval(15 * 60)
+            if driveRetryAfter.count > 500 { driveRetryAfter = driveRetryAfter.filter { $0.value > Date() } }
+            let request = MKDirections.Request()
+            request.source = MKMapItem(placemark: MKPlacemark(coordinate: candidate.origin.coordinate))
+            request.destination = MKMapItem(placemark: MKPlacemark(coordinate: candidate.destination.coordinate))
+            request.transportType = .automobile; request.departureDate = Date()
+            let search = MKDirections(request: request); driveRequest = search
+            let result = try await search.calculateETA()
+            try Task.checkCancellation()
+            guard phase == .signedIn, candidate.zip == preferences.zip else { return }
+            guard result.expectedTravelTime.isFinite, result.expectedTravelTime > 0, result.expectedTravelTime <= 14400 else { return }
+            let seconds = Int(ceil(result.expectedTravelTime))
+            let _: Acknowledgement = try await api.put("/v1/travel-estimates/\(candidate.storeId)", body:
+                TravelUpdate(zip: candidate.zip, latitude: candidate.destination.latitude,
+                             longitude: candidate.destination.longitude, seconds: seconds))
+            driveRetryAfter.removeValue(forKey: key)
+        } catch {
+            nextDriveRequest = Date().addingTimeInterval(60)
+            if let mapError = error as? MKError, mapError.code == .loadingThrottled {
+                nextDriveRequest = Date().addingTimeInterval(5 * 60)
+            }
+            if let apiError = error as? APIError, apiError.endsSession { await report(error, quiet: true) }
+        }
+    }
+    func cancelDriveEstimate() { driveRequest?.cancel() }
+    func saveDriveEstimate(_ store: Store, zip: String, seconds: Int) async {
+        guard phase == .signedIn, zip == preferences.zip, let latitude = store.latitude, let longitude = store.longitude,
+              !store.excluded, let distance = store.distanceMiles, distance <= 25, seconds > 0, seconds <= 14400 else { return }
+        do {
+            let _: Acknowledgement = try await client().put("/v1/travel-estimates/\(store.id)", body:
+                TravelUpdate(zip: zip, latitude: latitude, longitude: longitude, seconds: seconds))
+        } catch { if let value = error as? APIError, value.endsSession { await report(value) } }
+    }
     func logout() async {
         guard !busy else { return }; busy = true; defer { busy = false }
         do { try await client().logout(); clearVisibleAccount() }
         catch { await report(error) }
     }
     private func clearVisibleAccount() {
+        cancelDriveEstimate(); driveRetryAfter = [:]; nextDriveRequest = .distantPast
         revision += 1
         phase = .signedOut; member = nil; stores = []; favorites = []; events = []; catalog = []
         preferences = .empty; monitoring = nil; pendingHandoff = nil; needsTransfer = false

@@ -1,0 +1,54 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { backup, DatabaseSync } from 'node:sqlite';
+import { fixture, device, login, authenticate, ALICE } from './helpers.js';
+import { AuthService } from '../src/auth.js';
+import { openDatabase } from '../src/database.js';
+import { AppData } from '../src/app-data.js';
+import { loadCatalog } from '../src/catalog.js';
+import { prepareRestore } from '../src/recovery.js';
+
+test('the delivered v2 database upgrades with its active login, settings, notes, favorites, history, and pending stock intact', async t => {
+  const base = fixture(t), folder = fs.mkdtempSync(path.join(os.tmpdir(), 'takeoff-v2-upgrade-'));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  let db = new DatabaseSync(path.join(folder, 'takeoff.sqlite'));
+  db.exec('PRAGMA foreign_keys=ON');
+  db.exec(fs.readFileSync(new URL('./fixtures/schema-v2.sql', import.meta.url), 'utf8'));
+  const f = { ...base, db, config: { ...base.config, dataDir: folder } };
+  f.auth = new AuthService(f);
+  const dev = device(), tokens = await login(f, dev);
+  db.prepare('INSERT INTO zip_regions VALUES (?,?,?,?,?)').run('24060', 37.23, -80.42, 'Blacksburg, VA', f.clock());
+  db.prepare('INSERT INTO preferences VALUES (?,?,?,?,?)').run(ALICE, '24060', '["196214158801"]', '{"stockIncrease":true}', f.clock());
+  db.prepare('INSERT INTO stores (id,address,city,state,latitude,longitude,updated_at) VALUES (?,?,?,?,?,?,?)')
+    .run('100', '100 Test Street', 'Blacksburg', 'VA', 37.23, -80.42, f.clock());
+  db.prepare('INSERT INTO store_preferences VALUES (?,?,?,?,?,?)').run(ALICE, '100', 1, 0, 'Keep this private', f.clock());
+  db.prepare('INSERT INTO public_notes VALUES (?,?,?,?)').run('100', 'Limit one', ALICE, f.clock());
+  db.prepare('INSERT INTO inventory VALUES (?,?,?,?,?,?,?,?)').run('100', '196214158801', 12, 'back', 12, f.clock(), f.clock(), null);
+  db.prepare('INSERT INTO area_inventory VALUES (?,?,?,?,?)').run('24060', '100', '196214158801', 0, f.clock());
+  db.prepare('INSERT INTO inventory_history (store_id,upc,quantity,status,kind,created_at) VALUES (?,?,?,?,?,?)')
+    .run('100', '196214158801', 12, 'back', 'stock_increase', f.clock());
+  const backupFile = path.join(folder, 'before-v3.sqlite');
+  await backup(db, backupFile);
+  db.close();
+  db = openDatabase(folder); t.after(() => db.close());
+  f.db = db; f.auth = new AuthService(f);
+  assert.equal(db.prepare('PRAGMA user_version').get().user_version, 3);
+  assert.equal(authenticate(f, dev, tokens.accessToken).discord_id, ALICE);
+  const appData = new AppData({ ...f, catalog: loadCatalog() });
+  const store = appData.store(ALICE, '100');
+  assert.equal(store.privateNote, 'Keep this private'); assert.equal(store.publicNote, 'Limit one'); assert.equal(store.favorite, true);
+  assert.equal(store.inventory[0].quantity, 12); assert.equal(store.inventory[0].forecast, null);
+  assert.equal(appData.history('100').history.length, 1); assert.equal(appData.settings(ALICE).alerts.stockIncrease, true);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM store_timing').get().n, 0);
+  assert.equal(db.prepare('PRAGMA integrity_check').get().integrity_check, 'ok');
+  const prepared = path.join(folder, 'prepared-v2.sqlite');
+  await prepareRestore(backupFile, prepared, f.clock());
+  const old = new DatabaseSync(prepared, { readOnly: true });
+  assert.equal(old.prepare('PRAGMA user_version').get().user_version, 2);
+  assert.equal(old.prepare('SELECT COUNT(*) n FROM sessions').get().n, 0);
+  assert.equal(old.prepare('SELECT private_note FROM store_preferences').get().private_note, 'Keep this private');
+  old.close();
+});

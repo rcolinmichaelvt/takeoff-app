@@ -1,15 +1,22 @@
 {
   "name": "takeoff-backend",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Takeoff's private API, inventory worker, and persistent app data",
   "type": "module",
-  "engines": { "node": ">=24 <25" },
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "start": "node --env-file-if-exists=.env src/main.js",
     "test": "node --test test/*.test.js",
     "import-cache": "node --env-file-if-exists=.env scripts/import-cache.js",
     "backup": "node --env-file-if-exists=.env scripts/backup.js",
-    "prepare-restore": "node scripts/prepare-restore.js"
+    "prepare-restore": "node scripts/prepare-restore.js",
+    "inspect-hours": "node --env-file-if-exists=.env scripts/inspect-hours.js"
+  },
+  "dependencies": {
+    "@js-temporal/polyfill": "0.5.1",
+    "geo-tz": "8.1.10"
   }
 }

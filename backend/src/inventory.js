@@ -1,7 +1,8 @@
 import { transaction } from './database.js';
 import { milesBetween } from './geography.js';
+import { storeAddress } from './event-display.js';
 
-// Basic shelf inference for the map. Business-hour timing/forecasts belong to M3.
+// Shelf inference remains independent of predicted timing: no timed green pins.
 export function observeInventory(previous, quantity, now, maximumGap = 9 * 60_000) {
   const fresh = previous && now >= previous.observed_at && now - previous.observed_at <= maximumGap;
   const next = { quantity, status: quantity === 0 ? 'out' : 'unknown', pending: 0,
@@ -61,6 +62,7 @@ export class Inventory {
           .run(job.zip, store.id, job.upc, distance, now);
         const previous = this.db.prepare('SELECT * FROM inventory WHERE store_id=? AND upc=?').get(store.id, job.upc);
         const next = observeInventory(previous, store.quantity, now, this.config.monitor.staleAfterMs);
+        this.appData.intelligence.observe(store.id, job.upc, previous, next, now);
         this.db.prepare(`INSERT INTO inventory (store_id,upc,quantity,status,pending_quantity,observed_at,last_increase_at,last_decrease_at)
           VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(store_id,upc) DO UPDATE SET quantity=excluded.quantity,status=excluded.status,
           pending_quantity=excluded.pending_quantity,observed_at=excluded.observed_at,
@@ -90,7 +92,7 @@ export class Inventory {
         .get(member.discord_id, store.id)?.excluded) continue;
       this.db.prepare('INSERT INTO events (discord_id,kind,payload_json,created_at) VALUES (?,?,?,?)')
         .run(member.discord_id, next.event, JSON.stringify({ storeId: store.id, upc, title: `${labels[next.event]} · ${title}`,
-          body: `Dollar General #${store.id}: ${oldQuantity} → ${store.quantity}.`, quantity: store.quantity,
+          address: storeAddress(store), body: `${oldQuantity} → ${store.quantity}.`, quantity: store.quantity,
           notificationsPaused: member.alerts.paused }), now);
     }
   }

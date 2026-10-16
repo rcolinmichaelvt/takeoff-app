@@ -7,6 +7,7 @@ import { RateLimiter } from './rate-limit.js';
 import { loadCatalog } from './catalog.js';
 import { createGeography } from './geography.js';
 import { AppData } from './app-data.js';
+import { eventPayload } from './event-display.js';
 
 const BODY_LIMIT = 16 * 1024;
 
@@ -111,7 +112,7 @@ export function createServer({ config, db, discord, clock = Date.now, logger = c
         return send(res, 200, { discordId: session.discord_id, displayName: session.display_name,
           role: config.moderatorIds.has(session.discord_id) ? 'moderator' : 'member',
           deviceName: session.device_name, nextDeviceTransferAt: new Date(session.next_transfer_at).toISOString(),
-          capabilities: { monitoring: config.monitor.enabled, inventory: true, predictions: false, remotePush: false, appAttestRequired: false },
+          capabilities: { monitoring: config.monitor.enabled, inventory: true, predictions: true, remotePush: false, appAttestRequired: false },
         });
       }
       if (method === 'GET' && route === '/v1/catalog') return send(res, 200, { products: catalog });
@@ -122,6 +123,14 @@ export function createServer({ config, db, discord, clock = Date.now, logger = c
         return send(res, 200, result);
       }
       if (method === 'GET' && route === '/v1/monitor/status') return send(res, 200, appData.monitoringStatus());
+      if (method === 'GET' && route === '/v1/travel-estimates/needed') {
+        return send(res, 200, { candidates: appData.travelCandidates(session.discord_id) });
+      }
+      const travelRoute = route.match(/^\/v1\/travel-estimates\/(\d{1,12})$/);
+      if (method === 'PUT' && travelRoute) {
+        limiter.take(`travel:${session.discord_id}`, 10, 60_000);
+        return send(res, 200, appData.saveTravel(session.discord_id, travelRoute[1], data));
+      }
       if (method === 'GET' && route === '/v1/stores') {
         requireCondition([...url.searchParams.keys()].every(k => ['scope', 'after', 'limit', 'favorites'].includes(k)),
           400, 'INVALID_INPUT', 'Invalid store filter.');
@@ -154,7 +163,7 @@ export function createServer({ config, db, discord, clock = Date.now, logger = c
         const more = rows.length > limit;
         const selected = rows.slice(0, limit);
         return send(res, 200, { events: selected.map(row => ({ id: row.id, kind: row.kind,
-          payload: JSON.parse(row.payload_json), createdAt: new Date(row.created_at).toISOString(),
+          payload: eventPayload(db, row), createdAt: new Date(row.created_at).toISOString(),
           readAt: row.read_at === null ? null : new Date(row.read_at).toISOString() })),
         nextCursor: more ? selected.at(-1).id : null });
       }

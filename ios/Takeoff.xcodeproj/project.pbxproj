@@ -1,566 +1,449 @@
 // !$*UTF8*$!
 {
-	"archiveVersion" = 1;
-	"classes" = {
+	archiveVersion = 1;
+	classes = {
 	};
-	"objectVersion" = 56;
-	"objects" = {
-		"E4728E40D7002CBBC609FE5C" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "APIClient.swift";
-			"sourceTree" = "<group>";
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		38050452B5CBC8497C9782B0 /* AppConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9C5D2A0FD4743CC03C3E6EB /* AppConfiguration.swift */; };
+		3A14D3D72F80760A119CC199 /* ProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AC7BB6991896226E98FC1C5 /* ProtocolTests.swift */; };
+		3B50A14E62AE60C75975E05E /* DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03F9398C66AEA74DBE8C0A3 /* DiscoverView.swift */; };
+		3CE81A81290A4B728C9F5FCE /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8271C25E54FD23B4408A551 /* Models.swift */; };
+		4764B0BFD0057C9AA863C278 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04E7D0AC43AD90DB538BF3AD /* SettingsView.swift */; };
+		48C5FBDAA7AFE22BDFADCCE5 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE743946DF10A85666BF336F /* AppModel.swift */; };
+		5B523D6849EF285AEC001C4C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 492B687FFA3563BDF2F29049 /* Assets.xcassets */; };
+		5EE07EE0265CDF8680949876 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C1F30ADA9DB7216CBD15160 /* KeychainStore.swift */; };
+		75106DE3B2DACE2B8C3B9DFA /* LocationPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF0D1EC60E5C1128089C96E4 /* LocationPicker.swift */; };
+		79C4E1D41AA6E22B961EA124 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0603DA7368BCE0FBEB02321 /* Components.swift */; };
+		7B75DEB5EBD959982CE12942 /* FavoritesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8289265D6E930F7670968FAB /* FavoritesView.swift */; };
+		96E861C85D48B452D5CC83B8 /* StoreDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57A49E990B01477ADF8BEB54 /* StoreDetailView.swift */; };
+		A93A6066A957E0048162DD62 /* InboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FC50E06FECA188F29D51940 /* InboxView.swift */; };
+		CC94E87F0AEB96E0948192B9 /* WebSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A80B67A015A5889C2AA9EF6 /* WebSignIn.swift */; };
+		D53F048C7A486BB5154B92E3 /* Fixtures/request-proof.json in Resources */ = {isa = PBXBuildFile; fileRef = 9E87336279E86FF8A4268BDA /* Fixtures/request-proof.json */; };
+		DD867554495441ED4B0E231D /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4728E40D7002CBBC609FE5C /* APIClient.swift */; };
+		EAA3DD16925982E83B10223F /* TakeoffApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EB0A63C149AE84C4E3CAECD /* TakeoffApp.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		5F8A3EF7DBD7889459E60309 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D54BCD2846A24FB130B448CE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E6F9A7737F56BB2E8C60D065;
+			remoteInfo = Takeoff;
 		};
-		"DD867554495441ED4B0E231D" = {
-			"isa" = "PBXBuildFile";
-			"fileRef" = "E4728E40D7002CBBC609FE5C";
-		};
-		"B9C5D2A0FD4743CC03C3E6EB" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "AppConfiguration.swift";
-			"sourceTree" = "<group>";
-		};
-		"38050452B5CBC8497C9782B0" = {
-			"isa" = "PBXBuildFile";
-			"fileRef" = "B9C5D2A0FD4743CC03C3E6EB";
-		};
-		"CE743946DF10A85666BF336F" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "AppModel.swift";
-			"sourceTree" = "<group>";
-		};
-		"48C5FBDAA7AFE22BDFADCCE5" = {
-			"isa" = "PBXBuildFile";
-			"fileRef" = "CE743946DF10A85666BF336F";
-		};
-		"C0603DA7368BCE0FBEB02321" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "Components.swift";
-			"sourceTree" = "<group>";
-		};
-		"79C4E1D41AA6E22B961EA124" = {
-			"isa" = "PBXBuildFile";
-			"fileRef" = "C0603DA7368BCE0FBEB02321";
-		};
-		"C03F9398C66AEA74DBE8C0A3" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "DiscoverView.swift";
-			"sourceTree" = "<group>";
-		};
-		"3B50A14E62AE60C75975E05E" = {
-			"isa" = "PBXBuildFile";
-			"fileRef" = "C03F9398C66AEA74DBE8C0A3";
-		};
-		"8289265D6E930F7670968FAB" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "FavoritesView.swift";
-			"sourceTree" = "<group>";
-		};
-		"7B75DEB5EBD959982CE12942" = {
-			"isa" = "PBXBuildFile";
-			"fileRef" = "8289265D6E930F7670968FAB";
-		};
-		"2FC50E06FECA188F29D51940" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "InboxView.swift";
-			"sourceTree" = "<group>";
-		};
-		"A93A6066A957E0048162DD62" = {
-			"isa" = "PBXBuildFile";
-			"fileRef" = "2FC50E06FECA188F29D51940";
-		};
-		"4C1F30ADA9DB7216CBD15160" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "KeychainStore.swift";
-			"sourceTree" = "<group>";
-		};
-		"5EE07EE0265CDF8680949876" = {
-			"isa" = "PBXBuildFile";
-			"fileRef" = "4C1F30ADA9DB7216CBD15160";
-		};
-		"CF0D1EC60E5C1128089C96E4" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "LocationPicker.swift";
-			"sourceTree" = "<group>";
-		};
-		"75106DE3B2DACE2B8C3B9DFA" = {
-			"isa" = "PBXBuildFile";
-			"fileRef" = "CF0D1EC60E5C1128089C96E4";
-		};
-		"D8271C25E54FD23B4408A551" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "Models.swift";
-			"sourceTree" = "<group>";
-		};
-		"3CE81A81290A4B728C9F5FCE" = {
-			"isa" = "PBXBuildFile";
-			"fileRef" = "D8271C25E54FD23B4408A551";
-		};
-		"04E7D0AC43AD90DB538BF3AD" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "SettingsView.swift";
-			"sourceTree" = "<group>";
-		};
-		"4764B0BFD0057C9AA863C278" = {
-			"isa" = "PBXBuildFile";
-			"fileRef" = "04E7D0AC43AD90DB538BF3AD";
-		};
-		"57A49E990B01477ADF8BEB54" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "StoreDetailView.swift";
-			"sourceTree" = "<group>";
-		};
-		"96E861C85D48B452D5CC83B8" = {
-			"isa" = "PBXBuildFile";
-			"fileRef" = "57A49E990B01477ADF8BEB54";
-		};
-		"1EB0A63C149AE84C4E3CAECD" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "TakeoffApp.swift";
-			"sourceTree" = "<group>";
-		};
-		"EAA3DD16925982E83B10223F" = {
-			"isa" = "PBXBuildFile";
-			"fileRef" = "1EB0A63C149AE84C4E3CAECD";
-		};
-		"1A80B67A015A5889C2AA9EF6" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "WebSignIn.swift";
-			"sourceTree" = "<group>";
-		};
-		"CC94E87F0AEB96E0948192B9" = {
-			"isa" = "PBXBuildFile";
-			"fileRef" = "1A80B67A015A5889C2AA9EF6";
-		};
-		"B1EC44D8A16A8460341DD538" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "text.plist.xml";
-			"path" = "Info.plist";
-			"sourceTree" = "<group>";
-		};
-		"492B687FFA3563BDF2F29049" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "folder.assetcatalog";
-			"path" = "Assets.xcassets";
-			"sourceTree" = "<group>";
-		};
-		"5B523D6849EF285AEC001C4C" = {
-			"isa" = "PBXBuildFile";
-			"fileRef" = "492B687FFA3563BDF2F29049";
-		};
-		"1AC7BB6991896226E98FC1C5" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "sourcecode.swift";
-			"path" = "ProtocolTests.swift";
-			"sourceTree" = "<group>";
-		};
-		"9E87336279E86FF8A4268BDA" = {
-			"isa" = "PBXFileReference";
-			"lastKnownFileType" = "text.json";
-			"path" = "Fixtures/request-proof.json";
-			"sourceTree" = "<group>";
-		};
-		"3A14D3D72F80760A119CC199" = {
-			"isa" = "PBXBuildFile";
-			"fileRef" = "1AC7BB6991896226E98FC1C5";
-		};
-		"D53F048C7A486BB5154B92E3" = {
-			"isa" = "PBXBuildFile";
-			"fileRef" = "9E87336279E86FF8A4268BDA";
-		};
-		"22509E3BA95B3C63B6D7B36B" = {
-			"isa" = "PBXFileReference";
-			"explicitFileType" = "wrapper.application";
-			"includeInIndex" = 0;
-			"path" = "Takeoff.app";
-			"sourceTree" = "BUILT_PRODUCTS_DIR";
-		};
-		"ED6DAD3DBF169810C809C2AF" = {
-			"isa" = "PBXFileReference";
-			"explicitFileType" = "wrapper.cfbundle";
-			"includeInIndex" = 0;
-			"path" = "TakeoffTests.xctest";
-			"sourceTree" = "BUILT_PRODUCTS_DIR";
-		};
-		"5875B60950C314693E19EB84" = {
-			"isa" = "PBXGroup";
-			"children" = (
-				"E4728E40D7002CBBC609FE5C",
-				"B9C5D2A0FD4743CC03C3E6EB",
-				"CE743946DF10A85666BF336F",
-				"C0603DA7368BCE0FBEB02321",
-				"C03F9398C66AEA74DBE8C0A3",
-				"8289265D6E930F7670968FAB",
-				"2FC50E06FECA188F29D51940",
-				"4C1F30ADA9DB7216CBD15160",
-				"CF0D1EC60E5C1128089C96E4",
-				"D8271C25E54FD23B4408A551",
-				"04E7D0AC43AD90DB538BF3AD",
-				"57A49E990B01477ADF8BEB54",
-				"1EB0A63C149AE84C4E3CAECD",
-				"1A80B67A015A5889C2AA9EF6",
-				"B1EC44D8A16A8460341DD538",
-				"492B687FFA3563BDF2F29049",
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		04E7D0AC43AD90DB538BF3AD /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		1A80B67A015A5889C2AA9EF6 /* WebSignIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSignIn.swift; sourceTree = "<group>"; };
+		1AC7BB6991896226E98FC1C5 /* ProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolTests.swift; sourceTree = "<group>"; };
+		1EB0A63C149AE84C4E3CAECD /* TakeoffApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TakeoffApp.swift; sourceTree = "<group>"; };
+		22509E3BA95B3C63B6D7B36B /* Takeoff.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Takeoff.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2FC50E06FECA188F29D51940 /* InboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxView.swift; sourceTree = "<group>"; };
+		492B687FFA3563BDF2F29049 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		4C1F30ADA9DB7216CBD15160 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		57A49E990B01477ADF8BEB54 /* StoreDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreDetailView.swift; sourceTree = "<group>"; };
+		8289265D6E930F7670968FAB /* FavoritesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesView.swift; sourceTree = "<group>"; };
+		9E87336279E86FF8A4268BDA /* Fixtures/request-proof.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "Fixtures/request-proof.json"; sourceTree = "<group>"; };
+		B1EC44D8A16A8460341DD538 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B9C5D2A0FD4743CC03C3E6EB /* AppConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfiguration.swift; sourceTree = "<group>"; };
+		C03F9398C66AEA74DBE8C0A3 /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
+		C0603DA7368BCE0FBEB02321 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
+		CE743946DF10A85666BF336F /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		CF0D1EC60E5C1128089C96E4 /* LocationPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationPicker.swift; sourceTree = "<group>"; };
+		D8271C25E54FD23B4408A551 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		E4728E40D7002CBBC609FE5C /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		ED6DAD3DBF169810C809C2AF /* TakeoffTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TakeoffTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		050717C7C6E8D441FABE4E2A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
-			"path" = "Takeoff";
-			"sourceTree" = "<group>";
+			runOnlyForDeploymentPostprocessing = 0;
 		};
-		"457FE3C80765B8EC41AE0323" = {
-			"isa" = "PBXGroup";
-			"children" = (
-				"1AC7BB6991896226E98FC1C5",
-				"9E87336279E86FF8A4268BDA",
+		86C0C7A8A73F3A6F5E2AE5CF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
-			"path" = "TakeoffTests";
-			"sourceTree" = "<group>";
+			runOnlyForDeploymentPostprocessing = 0;
 		};
-		"35E7FDDF7660ACD38CFDA1E4" = {
-			"isa" = "PBXGroup";
-			"children" = (
-				"22509E3BA95B3C63B6D7B36B",
-				"ED6DAD3DBF169810C809C2AF",
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		35E7FDDF7660ACD38CFDA1E4 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				22509E3BA95B3C63B6D7B36B /* Takeoff.app */,
+				ED6DAD3DBF169810C809C2AF /* TakeoffTests.xctest */,
 			);
-			"name" = "Products";
-			"sourceTree" = "<group>";
+			name = Products;
+			sourceTree = "<group>";
 		};
-		"E1FD82031227E3BFE5D08337" = {
-			"isa" = "PBXGroup";
-			"children" = (
-				"5875B60950C314693E19EB84",
-				"457FE3C80765B8EC41AE0323",
-				"35E7FDDF7660ACD38CFDA1E4",
+		457FE3C80765B8EC41AE0323 /* TakeoffTests */ = {
+			isa = PBXGroup;
+			children = (
+				1AC7BB6991896226E98FC1C5 /* ProtocolTests.swift */,
+				9E87336279E86FF8A4268BDA /* Fixtures/request-proof.json */,
 			);
-			"sourceTree" = "<group>";
+			path = TakeoffTests;
+			sourceTree = "<group>";
 		};
-		"02CCC0F6B341A3AEBF775C27" = {
-			"isa" = "XCBuildConfiguration";
-			"buildSettings" = {
-				"ALWAYS_SEARCH_USER_PATHS" = "NO";
-				"CLANG_ENABLE_MODULES" = "YES";
-				"CLANG_ENABLE_OBJC_ARC" = "YES";
-				"CLANG_WARN_DOCUMENTATION_COMMENTS" = "YES";
-				"CLANG_WARN_UNREACHABLE_CODE" = "YES";
-				"GCC_C_LANGUAGE_STANDARD" = "gnu17";
-				"GCC_WARN_UNINITIALIZED_AUTOS" = "YES_AGGRESSIVE";
-				"GCC_WARN_UNUSED_FUNCTION" = "YES";
-				"GCC_WARN_UNUSED_VARIABLE" = "YES";
-				"IPHONEOS_DEPLOYMENT_TARGET" = "17.0";
-				"SDKROOT" = "iphoneos";
-				"SWIFT_VERSION" = "5.0";
-				"SWIFT_STRICT_CONCURRENCY" = "targeted";
-				"DEBUG_INFORMATION_FORMAT" = "dwarf";
-				"ENABLE_TESTABILITY" = "YES";
-				"GCC_OPTIMIZATION_LEVEL" = "0";
-				"GCC_PREPROCESSOR_DEFINITIONS" = (
-					"DEBUG=1",
-					"$(inherited)",
-				);
-				"ONLY_ACTIVE_ARCH" = "YES";
-				"SWIFT_ACTIVE_COMPILATION_CONDITIONS" = "DEBUG $(inherited)";
-				"SWIFT_OPTIMIZATION_LEVEL" = "-Onone";
-			};
-			"name" = "Debug";
-		};
-		"FF726F4380C41A7F31AD1AE6" = {
-			"isa" = "XCBuildConfiguration";
-			"buildSettings" = {
-				"ALWAYS_SEARCH_USER_PATHS" = "NO";
-				"CLANG_ENABLE_MODULES" = "YES";
-				"CLANG_ENABLE_OBJC_ARC" = "YES";
-				"CLANG_WARN_DOCUMENTATION_COMMENTS" = "YES";
-				"CLANG_WARN_UNREACHABLE_CODE" = "YES";
-				"GCC_C_LANGUAGE_STANDARD" = "gnu17";
-				"GCC_WARN_UNINITIALIZED_AUTOS" = "YES_AGGRESSIVE";
-				"GCC_WARN_UNUSED_FUNCTION" = "YES";
-				"GCC_WARN_UNUSED_VARIABLE" = "YES";
-				"IPHONEOS_DEPLOYMENT_TARGET" = "17.0";
-				"SDKROOT" = "iphoneos";
-				"SWIFT_VERSION" = "5.0";
-				"SWIFT_STRICT_CONCURRENCY" = "targeted";
-				"DEBUG_INFORMATION_FORMAT" = "dwarf-with-dsym";
-				"SWIFT_COMPILATION_MODE" = "wholemodule";
-				"SWIFT_OPTIMIZATION_LEVEL" = "-O";
-				"VALIDATE_PRODUCT" = "YES";
-			};
-			"name" = "Release";
-		};
-		"23E36883A0B4AEABB14C70DC" = {
-			"isa" = "XCConfigurationList";
-			"buildConfigurations" = (
-				"02CCC0F6B341A3AEBF775C27",
-				"FF726F4380C41A7F31AD1AE6",
+		5875B60950C314693E19EB84 /* Takeoff */ = {
+			isa = PBXGroup;
+			children = (
+				E4728E40D7002CBBC609FE5C /* APIClient.swift */,
+				B9C5D2A0FD4743CC03C3E6EB /* AppConfiguration.swift */,
+				CE743946DF10A85666BF336F /* AppModel.swift */,
+				C0603DA7368BCE0FBEB02321 /* Components.swift */,
+				C03F9398C66AEA74DBE8C0A3 /* DiscoverView.swift */,
+				8289265D6E930F7670968FAB /* FavoritesView.swift */,
+				2FC50E06FECA188F29D51940 /* InboxView.swift */,
+				4C1F30ADA9DB7216CBD15160 /* KeychainStore.swift */,
+				CF0D1EC60E5C1128089C96E4 /* LocationPicker.swift */,
+				D8271C25E54FD23B4408A551 /* Models.swift */,
+				04E7D0AC43AD90DB538BF3AD /* SettingsView.swift */,
+				57A49E990B01477ADF8BEB54 /* StoreDetailView.swift */,
+				1EB0A63C149AE84C4E3CAECD /* TakeoffApp.swift */,
+				1A80B67A015A5889C2AA9EF6 /* WebSignIn.swift */,
+				B1EC44D8A16A8460341DD538 /* Info.plist */,
+				492B687FFA3563BDF2F29049 /* Assets.xcassets */,
 			);
-			"defaultConfigurationIsVisible" = 0;
-			"defaultConfigurationName" = "Release";
+			path = Takeoff;
+			sourceTree = "<group>";
 		};
-		"3784B87436403960586F735E" = {
-			"isa" = "XCBuildConfiguration";
-			"buildSettings" = {
-				"CODE_SIGN_STYLE" = "Automatic";
-				"DEVELOPMENT_TEAM" = "";
-				"CURRENT_PROJECT_VERSION" = "2";
-				"MARKETING_VERSION" = "0.2.0";
-				"TARGETED_DEVICE_FAMILY" = "1";
-				"SUPPORTED_PLATFORMS" = "iphoneos iphonesimulator";
-				"SUPPORTS_MACCATALYST" = "NO";
-				"SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD" = "NO";
-				"LD_RUNPATH_SEARCH_PATHS" = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				"PRODUCT_NAME" = "$(TARGET_NAME)";
-				"ASSETCATALOG_COMPILER_APPICON_NAME" = "AppIcon";
-				"ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME" = "AccentColor";
-				"GENERATE_INFOPLIST_FILE" = "NO";
-				"INFOPLIST_FILE" = "Takeoff/Info.plist";
-				"PRODUCT_BUNDLE_IDENTIFIER" = "com.yourname.takeoff";
-			};
-			"name" = "Debug";
-		};
-		"A99A47FBED198A99BDEE17A1" = {
-			"isa" = "XCBuildConfiguration";
-			"buildSettings" = {
-				"CODE_SIGN_STYLE" = "Automatic";
-				"DEVELOPMENT_TEAM" = "";
-				"CURRENT_PROJECT_VERSION" = "2";
-				"MARKETING_VERSION" = "0.2.0";
-				"TARGETED_DEVICE_FAMILY" = "1";
-				"SUPPORTED_PLATFORMS" = "iphoneos iphonesimulator";
-				"SUPPORTS_MACCATALYST" = "NO";
-				"SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD" = "NO";
-				"LD_RUNPATH_SEARCH_PATHS" = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				"PRODUCT_NAME" = "$(TARGET_NAME)";
-				"ASSETCATALOG_COMPILER_APPICON_NAME" = "AppIcon";
-				"ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME" = "AccentColor";
-				"GENERATE_INFOPLIST_FILE" = "NO";
-				"INFOPLIST_FILE" = "Takeoff/Info.plist";
-				"PRODUCT_BUNDLE_IDENTIFIER" = "com.yourname.takeoff";
-			};
-			"name" = "Release";
-		};
-		"7418B43C269805611426AC5F" = {
-			"isa" = "XCConfigurationList";
-			"buildConfigurations" = (
-				"3784B87436403960586F735E",
-				"A99A47FBED198A99BDEE17A1",
+		E1FD82031227E3BFE5D08337 = {
+			isa = PBXGroup;
+			children = (
+				5875B60950C314693E19EB84 /* Takeoff */,
+				457FE3C80765B8EC41AE0323 /* TakeoffTests */,
+				35E7FDDF7660ACD38CFDA1E4 /* Products */,
 			);
-			"defaultConfigurationIsVisible" = 0;
-			"defaultConfigurationName" = "Release";
+			sourceTree = "<group>";
 		};
-		"1F974E1F3E4E19C1335CDF56" = {
-			"isa" = "XCBuildConfiguration";
-			"buildSettings" = {
-				"CODE_SIGN_STYLE" = "Automatic";
-				"DEVELOPMENT_TEAM" = "";
-				"CURRENT_PROJECT_VERSION" = "2";
-				"MARKETING_VERSION" = "0.2.0";
-				"TARGETED_DEVICE_FAMILY" = "1";
-				"SUPPORTED_PLATFORMS" = "iphoneos iphonesimulator";
-				"SUPPORTS_MACCATALYST" = "NO";
-				"SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD" = "NO";
-				"LD_RUNPATH_SEARCH_PATHS" = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				"PRODUCT_NAME" = "$(TARGET_NAME)";
-				"GENERATE_INFOPLIST_FILE" = "YES";
-				"PRODUCT_BUNDLE_IDENTIFIER" = "com.yourname.takeoff.tests";
-				"BUNDLE_LOADER" = "$(TEST_HOST)";
-				"TEST_HOST" = "$(BUILT_PRODUCTS_DIR)/Takeoff.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Takeoff";
-				"SKIP_INSTALL" = "YES";
-			};
-			"name" = "Debug";
-		};
-		"2FD4BFE59B10DD60091472EE" = {
-			"isa" = "XCBuildConfiguration";
-			"buildSettings" = {
-				"CODE_SIGN_STYLE" = "Automatic";
-				"DEVELOPMENT_TEAM" = "";
-				"CURRENT_PROJECT_VERSION" = "2";
-				"MARKETING_VERSION" = "0.2.0";
-				"TARGETED_DEVICE_FAMILY" = "1";
-				"SUPPORTED_PLATFORMS" = "iphoneos iphonesimulator";
-				"SUPPORTS_MACCATALYST" = "NO";
-				"SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD" = "NO";
-				"LD_RUNPATH_SEARCH_PATHS" = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				"PRODUCT_NAME" = "$(TARGET_NAME)";
-				"GENERATE_INFOPLIST_FILE" = "YES";
-				"PRODUCT_BUNDLE_IDENTIFIER" = "com.yourname.takeoff.tests";
-				"BUNDLE_LOADER" = "$(TEST_HOST)";
-				"TEST_HOST" = "$(BUILT_PRODUCTS_DIR)/Takeoff.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Takeoff";
-				"SKIP_INSTALL" = "YES";
-			};
-			"name" = "Release";
-		};
-		"67C2D144C02DDD396AFBFE9B" = {
-			"isa" = "XCConfigurationList";
-			"buildConfigurations" = (
-				"1F974E1F3E4E19C1335CDF56",
-				"2FD4BFE59B10DD60091472EE",
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		74B0D01AEDD5BFA17DE148B0 /* TakeoffTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 67C2D144C02DDD396AFBFE9B /* Build configuration list for PBXNativeTarget "TakeoffTests" */;
+			buildPhases = (
+				C22E2B2F1030C3BEA924C14E /* Sources */,
+				86C0C7A8A73F3A6F5E2AE5CF /* Frameworks */,
+				87B4C2E766DCE281844BEEFE /* Resources */,
 			);
-			"defaultConfigurationIsVisible" = 0;
-			"defaultConfigurationName" = "Release";
+			buildRules = (
+			);
+			dependencies = (
+				46B8330B5F41826CE70B6734 /* PBXTargetDependency */,
+			);
+			name = TakeoffTests;
+			productName = TakeoffTests;
+			productReference = ED6DAD3DBF169810C809C2AF /* TakeoffTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		"FEF6E3C1EAD542956D6375C2" = {
-			"isa" = "PBXSourcesBuildPhase";
-			"buildActionMask" = 2147483647;
-			"files" = (
-				"DD867554495441ED4B0E231D",
-				"38050452B5CBC8497C9782B0",
-				"48C5FBDAA7AFE22BDFADCCE5",
-				"79C4E1D41AA6E22B961EA124",
-				"3B50A14E62AE60C75975E05E",
-				"7B75DEB5EBD959982CE12942",
-				"A93A6066A957E0048162DD62",
-				"5EE07EE0265CDF8680949876",
-				"75106DE3B2DACE2B8C3B9DFA",
-				"3CE81A81290A4B728C9F5FCE",
-				"4764B0BFD0057C9AA863C278",
-				"96E861C85D48B452D5CC83B8",
-				"EAA3DD16925982E83B10223F",
-				"CC94E87F0AEB96E0948192B9",
+		E6F9A7737F56BB2E8C60D065 /* Takeoff */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7418B43C269805611426AC5F /* Build configuration list for PBXNativeTarget "Takeoff" */;
+			buildPhases = (
+				FEF6E3C1EAD542956D6375C2 /* Sources */,
+				050717C7C6E8D441FABE4E2A /* Frameworks */,
+				2E81BB658FEAA730CEE39BC7 /* Resources */,
 			);
-			"runOnlyForDeploymentPostprocessing" = 0;
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Takeoff;
+			productName = Takeoff;
+			productReference = 22509E3BA95B3C63B6D7B36B /* Takeoff.app */;
+			productType = "com.apple.product-type.application";
 		};
-		"050717C7C6E8D441FABE4E2A" = {
-			"isa" = "PBXFrameworksBuildPhase";
-			"buildActionMask" = 2147483647;
-			"files" = (
-			);
-			"runOnlyForDeploymentPostprocessing" = 0;
-		};
-		"2E81BB658FEAA730CEE39BC7" = {
-			"isa" = "PBXResourcesBuildPhase";
-			"buildActionMask" = 2147483647;
-			"files" = (
-				"5B523D6849EF285AEC001C4C",
-			);
-			"runOnlyForDeploymentPostprocessing" = 0;
-		};
-		"E6F9A7737F56BB2E8C60D065" = {
-			"isa" = "PBXNativeTarget";
-			"buildConfigurationList" = "7418B43C269805611426AC5F";
-			"buildPhases" = (
-				"FEF6E3C1EAD542956D6375C2",
-				"050717C7C6E8D441FABE4E2A",
-				"2E81BB658FEAA730CEE39BC7",
-			);
-			"buildRules" = (
-			);
-			"dependencies" = (
-			);
-			"name" = "Takeoff";
-			"productName" = "Takeoff";
-			"productReference" = "22509E3BA95B3C63B6D7B36B";
-			"productType" = "com.apple.product-type.application";
-		};
-		"5F8A3EF7DBD7889459E60309" = {
-			"isa" = "PBXContainerItemProxy";
-			"containerPortal" = "D54BCD2846A24FB130B448CE";
-			"proxyType" = 1;
-			"remoteGlobalIDString" = "E6F9A7737F56BB2E8C60D065";
-			"remoteInfo" = "Takeoff";
-		};
-		"46B8330B5F41826CE70B6734" = {
-			"isa" = "PBXTargetDependency";
-			"target" = "E6F9A7737F56BB2E8C60D065";
-			"targetProxy" = "5F8A3EF7DBD7889459E60309";
-		};
-		"C22E2B2F1030C3BEA924C14E" = {
-			"isa" = "PBXSourcesBuildPhase";
-			"buildActionMask" = 2147483647;
-			"files" = (
-				"3A14D3D72F80760A119CC199",
-			);
-			"runOnlyForDeploymentPostprocessing" = 0;
-		};
-		"86C0C7A8A73F3A6F5E2AE5CF" = {
-			"isa" = "PBXFrameworksBuildPhase";
-			"buildActionMask" = 2147483647;
-			"files" = (
-			);
-			"runOnlyForDeploymentPostprocessing" = 0;
-		};
-		"87B4C2E766DCE281844BEEFE" = {
-			"isa" = "PBXResourcesBuildPhase";
-			"buildActionMask" = 2147483647;
-			"files" = (
-				"D53F048C7A486BB5154B92E3",
-			);
-			"runOnlyForDeploymentPostprocessing" = 0;
-		};
-		"74B0D01AEDD5BFA17DE148B0" = {
-			"isa" = "PBXNativeTarget";
-			"buildConfigurationList" = "67C2D144C02DDD396AFBFE9B";
-			"buildPhases" = (
-				"C22E2B2F1030C3BEA924C14E",
-				"86C0C7A8A73F3A6F5E2AE5CF",
-				"87B4C2E766DCE281844BEEFE",
-			);
-			"buildRules" = (
-			);
-			"dependencies" = (
-				"46B8330B5F41826CE70B6734",
-			);
-			"name" = "TakeoffTests";
-			"productName" = "TakeoffTests";
-			"productReference" = "ED6DAD3DBF169810C809C2AF";
-			"productType" = "com.apple.product-type.bundle.unit-test";
-		};
-		"D54BCD2846A24FB130B448CE" = {
-			"isa" = "PBXProject";
-			"attributes" = {
-				"BuildIndependentTargetsInParallel" = "YES";
-				"LastUpgradeCheck" = "2600";
-				"LastSwiftUpdateCheck" = "2600";
-				"TargetAttributes" = {
-					"E6F9A7737F56BB2E8C60D065" = {
-						"CreatedOnToolsVersion" = "26.0";
-						"ProvisioningStyle" = "Automatic";
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D54BCD2846A24FB130B448CE /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastSwiftUpdateCheck = 2600;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+					74B0D01AEDD5BFA17DE148B0 = {
+						CreatedOnToolsVersion = 26.0;
+						ProvisioningStyle = Automatic;
+						TestTargetID = E6F9A7737F56BB2E8C60D065;
 					};
-					"74B0D01AEDD5BFA17DE148B0" = {
-						"CreatedOnToolsVersion" = "26.0";
-						"ProvisioningStyle" = "Automatic";
-						"TestTargetID" = "E6F9A7737F56BB2E8C60D065";
+					E6F9A7737F56BB2E8C60D065 = {
+						CreatedOnToolsVersion = 26.0;
+						ProvisioningStyle = Automatic;
 					};
 				};
 			};
-			"buildConfigurationList" = "23E36883A0B4AEABB14C70DC";
-			"compatibilityVersion" = "Xcode 14.0";
-			"developmentRegion" = "en";
-			"hasScannedForEncodings" = 0;
-			"knownRegions" = (
-				"en",
-				"Base",
+			buildConfigurationList = 23E36883A0B4AEABB14C70DC /* Build configuration list for PBXProject "Takeoff" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
 			);
-			"mainGroup" = "E1FD82031227E3BFE5D08337";
-			"productRefGroup" = "35E7FDDF7660ACD38CFDA1E4";
-			"projectDirPath" = "";
-			"projectRoot" = "";
-			"targets" = (
-				"E6F9A7737F56BB2E8C60D065",
-				"74B0D01AEDD5BFA17DE148B0",
+			mainGroup = E1FD82031227E3BFE5D08337;
+			productRefGroup = 35E7FDDF7660ACD38CFDA1E4 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E6F9A7737F56BB2E8C60D065 /* Takeoff */,
+				74B0D01AEDD5BFA17DE148B0 /* TakeoffTests */,
 			);
 		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		2E81BB658FEAA730CEE39BC7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5B523D6849EF285AEC001C4C /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		87B4C2E766DCE281844BEEFE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D53F048C7A486BB5154B92E3 /* Fixtures/request-proof.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C22E2B2F1030C3BEA924C14E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3A14D3D72F80760A119CC199 /* ProtocolTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FEF6E3C1EAD542956D6375C2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DD867554495441ED4B0E231D /* APIClient.swift in Sources */,
+				38050452B5CBC8497C9782B0 /* AppConfiguration.swift in Sources */,
+				48C5FBDAA7AFE22BDFADCCE5 /* AppModel.swift in Sources */,
+				79C4E1D41AA6E22B961EA124 /* Components.swift in Sources */,
+				3B50A14E62AE60C75975E05E /* DiscoverView.swift in Sources */,
+				7B75DEB5EBD959982CE12942 /* FavoritesView.swift in Sources */,
+				A93A6066A957E0048162DD62 /* InboxView.swift in Sources */,
+				5EE07EE0265CDF8680949876 /* KeychainStore.swift in Sources */,
+				75106DE3B2DACE2B8C3B9DFA /* LocationPicker.swift in Sources */,
+				3CE81A81290A4B728C9F5FCE /* Models.swift in Sources */,
+				4764B0BFD0057C9AA863C278 /* SettingsView.swift in Sources */,
+				96E861C85D48B452D5CC83B8 /* StoreDetailView.swift in Sources */,
+				EAA3DD16925982E83B10223F /* TakeoffApp.swift in Sources */,
+				CC94E87F0AEB96E0948192B9 /* WebSignIn.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		46B8330B5F41826CE70B6734 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E6F9A7737F56BB2E8C60D065 /* Takeoff */;
+			targetProxy = 5F8A3EF7DBD7889459E60309 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		02CCC0F6B341A3AEBF775C27 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = targeted;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		1F974E1F3E4E19C1335CDF56 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.takeoff.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Takeoff.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Takeoff";
+			};
+			name = Debug;
+		};
+		2FD4BFE59B10DD60091472EE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.takeoff.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Takeoff.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Takeoff";
+			};
+			name = Release;
+		};
+		3784B87436403960586F735E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = 79874B9MRY;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Takeoff/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rcolinmichael.takeoff;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		A99A47FBED198A99BDEE17A1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = 79874B9MRY;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Takeoff/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rcolinmichael.takeoff;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		FF726F4380C41A7F31AD1AE6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = targeted;
+				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		23E36883A0B4AEABB14C70DC /* Build configuration list for PBXProject "Takeoff" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				02CCC0F6B341A3AEBF775C27 /* Debug */,
+				FF726F4380C41A7F31AD1AE6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		67C2D144C02DDD396AFBFE9B /* Build configuration list for PBXNativeTarget "TakeoffTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1F974E1F3E4E19C1335CDF56 /* Debug */,
+				2FD4BFE59B10DD60091472EE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7418B43C269805611426AC5F /* Build configuration list for PBXNativeTarget "Takeoff" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3784B87436403960586F735E /* Debug */,
+				A99A47FBED198A99BDEE17A1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
 	};
-	"rootObject" = "D54BCD2846A24FB130B448CE";
+	rootObject = D54BCD2846A24FB130B448CE /* Project object */;
 }

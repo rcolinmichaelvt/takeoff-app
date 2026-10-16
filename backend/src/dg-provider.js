@@ -66,18 +66,12 @@ export function createDGProvider(config, fetchImpl = fetch) {
       throw new ProviderError('DG_AUTH_REQUIRED', 5 * 60_000);
     }
   })().finally(() => { refreshing = undefined; });
-  return {
-    close() { controller.abort(); },
-    async fetchInventory(region, upc) {
+  const requestJSON = async (url, options = {}) => {
       for (let attempt = 0; attempt < 2; attempt++) {
         let response;
         try {
-          response = await fetchImpl('https://dggo.dollargeneral.com/omni/api/store/search/inventory', {
-            method: 'POST', redirect: 'error', signal: signal(),
-            headers: { ...headers(), 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-            body: new URLSearchParams({ latitude: String(region.latitude), longitude: String(region.longitude),
-              radius: '25', upc, offerSourceType: '0' }),
-          });
+          response = await fetchImpl(url, { ...options, redirect: 'error', signal: signal(),
+            headers: { ...headers(), ...options.headers } });
         } catch { throw new ProviderError('DG_UNAVAILABLE'); }
         if (response.status === 429) throw new ProviderError('DG_RATE_LIMITED', retryDelay(response));
         if ([401, 403].includes(response.status)) {
@@ -91,9 +85,26 @@ export function createDGProvider(config, fetchImpl = fetch) {
           if (attempt === 0) { await refresh(); continue; }
           throw new ProviderError('DG_INVALID_RESPONSE');
         }
-        return normalizeStores(data);
+        return data;
       }
       throw new ProviderError('DG_UNAVAILABLE');
+  };
+  return {
+    close() { controller.abort(); },
+    async fetchInventory(region, upc) {
+      return normalizeStores(await requestJSON('https://dggo.dollargeneral.com/omni/api/store/search/inventory', {
+        method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+        body: new URLSearchParams({ latitude: String(region.latitude), longitude: String(region.longitude), radius: '25', upc, offerSourceType: '0' }),
+      }));
+    },
+    async fetchStoreInfo(id) {
+      if (!/^\d{1,12}$/.test(id)) throw new ProviderError('DG_INVALID_RESPONSE');
+      // Endpoint and storeinfo envelope are used by DG's public store directory.
+      const data = await requestJSON(`https://dggo.dollargeneral.com/omni/api/store/info/${id}`);
+      const info = data?.storeinfo;
+      if (!info || typeof info !== 'object' || Array.isArray(info) ||
+          info.storeNumber != null && String(info.storeNumber) !== id) throw new ProviderError('DG_INVALID_RESPONSE');
+      return info;
     },
   };
 }

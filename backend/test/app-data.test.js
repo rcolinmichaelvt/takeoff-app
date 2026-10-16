@@ -180,7 +180,7 @@ test('DG token refresh retries once, keeps secrets off result data, and respects
 
 test('the actual Milestone 1 schema upgrades without losing accounts or cooldowns', t => {
   // Recreate the previously delivered module in an isolated temp directory, never
-  // a production database. This exercises a real v1 -> v2 upgrade, not v2 startup.
+  // a production database. This exercises a real v1 -> current upgrade.
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'takeoff-upgrade-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const previous = new DatabaseSync(path.join(directory, 'takeoff.sqlite'));
@@ -193,7 +193,7 @@ test('the actual Milestone 1 schema upgrades without losing accounts or cooldown
     .run('fixture-session', ALICE, 'fixture-key', 1, 9999999999999);
   previous.close();
   const db = openDatabase(directory);
-  assert.equal(db.prepare('PRAGMA user_version').get().user_version, 2);
+  assert.equal(db.prepare('PRAGMA user_version').get().user_version, 3);
   assert.equal(db.prepare('SELECT next_transfer_at FROM users').get().next_transfer_at, 9999999999999);
   assert.equal(db.prepare('SELECT id FROM sessions').get().id, 'fixture-session');
   assert.equal(db.prepare('SELECT COUNT(*) n FROM preferences').get().n, 0);

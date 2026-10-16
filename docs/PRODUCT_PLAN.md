@@ -7,8 +7,8 @@ This plan records the decisions made before implementation. Features described h
 | Milestone | Deliverable | Acceptance target | Current state |
 | --- | --- | --- | --- |
 | 1. Backend foundation | Persistent storage, Discord allowlist, signed sessions, one installation, six-hour transfers, catalog/inbox API, backups | Automated auth/recovery checks pass; then real Railway/Discord check | Backend delivered; owner reports Railway is set up |
-| 2. First iPhone app | SwiftUI project, sign-in, ZIP/product settings, map/store details, favorites/exclusions, private/public notes, history/inbox; supporting inventory API | Run on the owner's iPhone against Railway; accurate unknown/freshness labels | Source prepared; backend tested; Xcode build and live integration pending |
-| 3. Inventory intelligence | New-stock batch tracking, opening-hours timing, store averages, confidence, patterns, approaching-time events | Agreed threshold examples and store-hours cases pass; compare with live observations | Planned |
+| 2. First iPhone app | SwiftUI project, sign-in, ZIP/product settings, map/store details, favorites/exclusions, private/public notes, history/inbox; supporting inventory API | Run on the owner's iPhone against Railway; accurate unknown/freshness labels | Owner reports iPhone sign-in, quantities, notes, privacy, favorites, and redeploy persistence passed; missed increase occurred while monitor was off |
+| 3. Inventory intelligence | New-stock batch tracking, opening-hours timing, store averages, confidence, patterns, approaching-time events | Agreed threshold examples and store-hours cases pass; compare with live observations | Source implemented; automated checks pass; live hours response and updated Xcode/device check pending |
 | 4. Trips | Suggested stop order, editable routes, arrival warnings, Apple Maps handoff, trip-change handling | Device-tested road estimates and Maps handoff | Planned |
 | 5. Notifications and beta | APNs, device push revocation, App Attest, TestFlight preparation | Physical-device push/revocation and beta testing using paid membership | Planned |
 

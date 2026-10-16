@@ -35,9 +35,11 @@ struct RootView: View {
             guard scenePhase == .active else { return }
             while !Task.isCancelled {
                 await model.refresh(quiet: true)
+                await model.refreshDriveEstimate()
                 do { try await Task.sleep(for: .seconds(30)) } catch { break }
             }
         }
+        .onChange(of: scenePhase) { _, phase in if phase != .active { model.cancelDriveEstimate() } }
         .alert("Takeoff", isPresented: Binding(get: { model.message != nil }, set: { if !$0 { model.message = nil } })) {
             Button("OK") { model.message = nil }
         } message: { Text(model.message ?? "") }
