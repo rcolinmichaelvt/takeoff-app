@@ -68,12 +68,13 @@ test('signed trip routes persist private plans, reject copied access and stale e
     city: 'Blacksburg', state: 'VA', latitude: 37.23, longitude: -80.42, distance: 0 }]);
   assert.equal((await f.get('/v1/trip')).status, 401);
   assert.equal((await f.request(device(), aliceTokens.accessToken, '/v1/trip')).status, 401);
-  const request = { products: ['196214158801'], storeIds: ['100'] };
+  const origin = { latitude: 37.24, longitude: -80.41 };
+  const request = { origin, products: ['196214158801'], storeIds: ['100'] };
   const preview = await (await f.request(alice, aliceTokens.accessToken, '/v1/trip/preview', request)).json();
   assert.equal(preview.trip.canOpen, false);
   const point = { latitude: 37.23, longitude: -80.42 };
-  const input = { ...request, version: 0, zip: '24060', origin: point, departureAt: preview.trip.departureAt,
-    legs: [{ storeId: '100', from: point, to: point, seconds: 60, meters: 100 }] };
+  const input = { ...request, version: 0, zip: '24060', origin, departureAt: preview.trip.departureAt,
+    legs: [{ storeId: '100', from: origin, to: point, seconds: 60, meters: 100 }] };
   assert.equal((await f.request(alice, aliceTokens.accessToken, '/v1/trip', { ...input, discordId: BOB }, 'PUT')).status, 400);
   const save = await f.request(alice, aliceTokens.accessToken, '/v1/trip', input, 'PUT');
   assert.equal(save.status, 200); assert.equal((await save.json()).version, 1);

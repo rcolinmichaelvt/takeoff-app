@@ -53,9 +53,13 @@ export class Trips {
     requireInput(Object.keys(input).every(k => ['products', 'storeIds', 'zip', 'origin', 'legs', 'departureAt'].includes(k)));
     const context = this.context(id), { settings, covered } = context;
     requireCondition(settings.zip && this.app.config.monitor.enabled, 409, 'TRIP_UNAVAILABLE', 'Save a ZIP and enable monitoring before planning a trip.');
+    requireCondition(input.origin && validCoordinate(input.origin.latitude, input.origin.longitude) &&
+      Object.keys(input.origin).every(k => ['latitude', 'longitude'].includes(k)),
+    400, 'INVALID_TRIP_ORIGIN', 'Update the iPhone app and allow current location to plan a trip.');
+    const origin = point(input.origin);
     const products = this.products(settings, input.products);
     const stores = context.rows.map(row => this.app.storeView(row, settings, covered));
-    const candidates = stores.filter(store => this.candidate(store, products)).sort((a, b) => a.distanceMiles - b.distanceMiles || a.id.localeCompare(b.id));
+    const candidates = stores.filter(store => this.candidate(store, products)).sort((a, b) => milesBetween(origin, a) - milesBetween(origin, b) || a.id.localeCompare(b.id));
     let selected;
     if (input.storeIds === undefined) {
       requireInput(input.legs === undefined);
@@ -71,13 +75,13 @@ export class Trips {
     }
     let departure = this.clock(), legs = [];
     if (input.legs !== undefined) {
-      requireInput(input.zip === settings.zip && samePoint(input.origin, settings.center));
+      requireInput(input.zip === settings.zip);
       departure = Date.parse(input.departureAt);
       requireInput(Number.isFinite(departure) && departure <= this.clock() + 30_000 && this.clock() - departure <= MAX_ROUTE_AGE);
       requireInput(Array.isArray(input.legs) && input.legs.length === selected.length);
       let elapsed = 0;
       legs = input.legs.map((leg, index) => {
-        const from = index ? selected[index - 1] : settings.center, to = selected[index];
+        const from = index ? selected[index - 1] : origin, to = selected[index];
         requireInput(leg && Object.keys(leg).every(k => ['storeId', 'from', 'to', 'seconds', 'meters'].includes(k)) &&
           leg.storeId === to.id && samePoint(leg.from, from) && samePoint(leg.to, to) &&
           Number.isSafeInteger(leg.seconds) && leg.seconds > 0 && leg.seconds <= 14400 &&
@@ -86,8 +90,8 @@ export class Trips {
         requireInput(elapsed <= 12 * 3600);
         return { storeId: to.id, from: point(from), to: point(to), seconds: leg.seconds, meters: leg.meters };
       });
-    } else selected = orderStops(settings.center, selected);
-    const data = { zip: settings.zip, origin: settings.center, products, storeIds: selected.map(s => s.id), legs,
+    } else selected = orderStops(origin, selected);
+    const data = { zip: settings.zip, origin, originSource: 'device', products, storeIds: selected.map(s => s.id), legs,
       departureAt: iso(departure), checkedAt: iso(this.clock()) };
     return { data, trip: this.view(id, data, context), candidates: candidates.slice(0, 250) };
   }
@@ -100,7 +104,8 @@ export class Trips {
     let state = available ? 'available' : predicted.length ? 'expected' : fresh.some(i => i.status === 'back') ? 'back' :
       relevant.length && relevant.every(i => !i.stale && i.quantity === 0) ? 'out' : 'unknown';
     if (!this.app.config.monitor.enabled) reasons.push('Monitoring is paused.');
-    if (context.settings.zip !== data.zip || !samePoint(context.settings.center, data.origin)) reasons.push('Your saved ZIP changed. Suggest a new route.');
+    if (context.settings.zip !== data.zip) reasons.push('Your saved ZIP changed. Suggest a new route.');
+    if (data.originSource !== 'device') reasons.push('Recalculate this older trip from your current location.');
     if (!data.products.every(p => context.settings.products.includes(p) && this.app.products.has(p))) reasons.push('Your followed products changed. Suggest a new route.');
     if (store.excluded) reasons.push('This store is excluded.');
     if (store.distanceMiles == null || store.distanceMiles > 25) reasons.push('This store is outside your saved area.');
@@ -130,21 +135,21 @@ export class Trips {
       const row = context.rows.find(s => s.id === id);
       const store = row ? this.app.storeView(row, context.settings, context.covered) : null;
       if (!store) return null;
-      const leg = data.legs[index], from = index ? context.rows.find(s => s.id === data.storeIds[index - 1]) : context.settings.center;
+      const leg = data.legs[index], from = index ? context.rows.find(s => s.id === data.storeIds[index - 1]) : data.origin;
       const validLeg = leg?.storeId === id && samePoint(leg.from, from) && samePoint(leg.to, store);
       elapsed += validLeg ? leg.seconds + (index ? STOP_SECONDS : 0) : 0;
       const complete = data.legs.length === data.storeIds.length && data.legs.slice(0, index + 1).every((l, i) =>
         l.storeId === data.storeIds[i] && samePoint(l.to, context.rows.find(s => s.id === l.storeId)) &&
-        samePoint(l.from, i ? context.rows.find(s => s.id === data.storeIds[i - 1]) : context.settings.center));
+        samePoint(l.from, i ? context.rows.find(s => s.id === data.storeIds[i - 1]) : data.origin));
       const arrival = complete ? departure + elapsed * 1000 : null;
       const state = this.state(store, data, arrival, context);
       return { store, arrivalAt: arrival == null ? null : iso(arrival), driveSeconds: validLeg ? leg.seconds : null,
         distanceMeters: validLeg ? leg.meters : null, ...state };
     }).filter(Boolean);
-    return { zip: data.zip, origin: data.origin, products: data.products, departureAt: data.departureAt, checkedAt: data.checkedAt,
+    return { zip: data.zip, origin: data.origin, originSource: data.originSource || 'zip', products: data.products, departureAt: data.departureAt, checkedAt: data.checkedAt,
       stopMinutes: STOP_SECONDS / 60, maxStops: MAX_TRIP_STOPS, stops,
       totalDriveSeconds: data.legs.reduce((sum, leg) => sum + leg.seconds, 0),
-      needsReplan: !roadFresh || this.clock() - departure > MAX_ROUTE_AGE,
+      needsReplan: data.originSource !== 'device' || !roadFresh || this.clock() - departure > MAX_ROUTE_AGE,
       canOpen: roadFresh && this.clock() - departure <= MAX_ROUTE_AGE && stops.length > 0 && stops.length === data.storeIds.length && stops.every(s => s.eligible) };
   }
   get(id) {

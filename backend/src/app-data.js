@@ -3,6 +3,7 @@ import { transaction } from './database.js';
 import { milesBetween } from './geography.js';
 import { Intelligence, TRAVEL_REFRESH_AGE } from './intelligence.js';
 import { Trips } from './trips.js';
+import { inventoryStatus, restoreRecentDecreaseSignals } from './inventory.js';
 
 export const defaultAlerts = Object.freeze({ firstDecrease: true, soldOut: true, approaching: true,
   stockIncrease: false, anyDecrease: false, tripChanges: true, paused: false });
@@ -12,6 +13,7 @@ export class AppData {
   constructor({ db, config, catalog, geography, clock = Date.now }) {
     Object.assign(this, { db, config, catalog, geography, clock });
     this.products = new Map(catalog.map(p => [p.upc, p]));
+    restoreRecentDecreaseSignals(db, clock());
     this.intelligence = new Intelligence({ db, config, clock });
     this.trips = new Trips(this);
   }
@@ -64,10 +66,10 @@ export class AppData {
     return jobs;
   }
 
-  coverage() {
+  coverage({ freshOnly = true } = {}) {
     const jobs = this.jobs(), covered = new Set();
     for (const row of this.db.prepare('SELECT zip,store_id,upc,seen_at FROM area_inventory').all()) {
-      if (jobs.has(`${row.zip}:${row.upc}`) && this.clock() - row.seen_at <= this.config.monitor.staleAfterMs) {
+      if (jobs.has(`${row.zip}:${row.upc}`) && (!freshOnly || this.clock() - row.seen_at <= this.config.monitor.staleAfterMs)) {
         covered.add(`${row.store_id}:${row.upc}`);
       }
     }
@@ -80,7 +82,7 @@ export class AppData {
       .filter(item => this.products.has(item.upc)).map(item => {
         const stale = !covered.has(`${row.id}:${item.upc}`) || this.clock() - item.observed_at > this.config.monitor.staleAfterMs;
         return { upc: item.upc, title: this.products.get(item.upc).title, quantity: item.quantity,
-          status: stale ? 'unknown' : item.status, stale, observedAt: iso(item.observed_at),
+          status: stale ? 'unknown' : inventoryStatus(item, this.clock()), stale, observedAt: iso(item.observed_at),
           lastIncreaseAt: iso(item.last_increase_at), lastDecreaseAt: iso(item.last_decrease_at),
           forecast: this.intelligence.forecast(row.id, item, stale, timing) };
       });
@@ -107,9 +109,11 @@ export class AppData {
       Number.isInteger(Number(limit)) && Number(limit) >= 1 && Number(limit) <= 250 && ['true', 'false'].includes(favorites),
     400, 'INVALID_INPUT', 'Invalid store scope or cursor.');
     const preferences = this.settings(discordId), covered = this.coverage();
+    const activeCoverage = scope === 'covered' ? this.coverage({ freshOnly: false }) : null;
     const rows = this.storeRows(discordId).filter(row => row.id > after && (favorites !== 'true' || row.favorite));
     const selected = [];
     for (const row of rows) {
+      if (activeCoverage && ![...this.products.keys()].some(upc => activeCoverage.has(`${row.id}:${upc}`))) continue;
       const store = this.storeView(row, preferences, covered);
       if (!store.inventory.length) continue;
       if (scope === 'nearby' && (store.distanceMiles === null || store.distanceMiles > 25)) continue;

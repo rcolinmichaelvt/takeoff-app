@@ -53,7 +53,7 @@ struct TripsView: View {
                                 .disabled(model.tripBusy || products.isEmpty)
                             if let progress = model.tripProgress { HStack { ProgressView(); Text(progress).font(.subheadline) } }
                         } footer: {
-                            Text("Start at your saved ZIP center with up to 10 likely-for-sale stores. Suggested order uses store locations; Apple Maps checks the drives.")
+                            Text("Start at your current location with up to 10 stores likely in stock in your saved area. Apple Maps checks the drives. Your monitored ZIP stays fixed.")
                         }
                         if model.tripDraft != nil {
                             Section {
@@ -89,7 +89,7 @@ struct TripsView: View {
     private func routeContent(_ plan: TripPlan, at date: Date) -> some View {
         Section {
             TripMap(plan: plan).frame(height: 230).listRowInsets(EdgeInsets())
-            LabeledContent("Start", value: "ZIP \(plan.zip)")
+            LabeledContent("Start", value: plan.originSource == "device" ? "Your location when planned" : "Recalculate from current location")
             if plan.totalDriveSeconds > 0 {
                 Text("\(plan.stops.count) stops · \(Int(ceil(Double(plan.totalDriveSeconds) / 60))) min driving").font(.headline)
             } else { Text("\(plan.stops.count) stops · Driving times pending").font(.headline) }
@@ -174,8 +174,8 @@ private struct TripMap: View {
     let plan: TripPlan
     var body: some View {
         Map(initialPosition: .automatic) {
-            Annotation("Start · ZIP \(plan.zip)", coordinate: plan.origin.coordinate) {
-                Image(systemName: "house.fill").padding(8).foregroundStyle(.white).background(Theme.purple, in: Circle())
+            Annotation("Trip start", coordinate: plan.origin.coordinate) {
+                Image(systemName: "location.fill").padding(8).foregroundStyle(.white).background(Theme.purple, in: Circle())
             }
             ForEach(Array(plan.stops.enumerated()), id: \.element.id) { index, stop in
                 if let coordinate = stop.store.coordinate {
@@ -185,7 +185,7 @@ private struct TripMap: View {
                     }
                 }
             }
-        }.mapControls { MapCompass() }.id(plan.storeIds.joined(separator: ":"))
+        }.mapControls { MapCompass() }.id(plan.origin.mapValue + plan.storeIds.joined(separator: ":"))
             .accessibilityLabel("Planned stops in visiting order")
     }
 }

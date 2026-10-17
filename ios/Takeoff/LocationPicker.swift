@@ -56,3 +56,61 @@ final class LocationPicker: NSObject, ObservableObject, CLLocationManagerDelegat
     }
     func cancel() { timeout?.cancel(); manager.stopUpdatingLocation(); geocoder.cancelGeocode(); busy = false }
 }
+
+// A single foreground fix for each route build. It never changes the saved ZIP.
+@MainActor
+final class TripLocationProvider: NSObject, CLLocationManagerDelegate {
+    private let manager = CLLocationManager()
+    private var pending: CheckedContinuation<TripPoint, Error>?
+    private var timeout: Task<Void, Never>?
+    override init() {
+        super.init()
+        manager.delegate = self
+        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+    }
+    func currentPoint() async throws -> TripPoint {
+        try Task.checkCancellation()
+        cancel()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                pending = continuation
+                timeout = Task { [weak self] in
+                    do { try await Task.sleep(for: .seconds(30)) } catch { return }
+                    self?.finish(.failure(ClientError.message("Couldn't get a fresh location. Try again where your iPhone has a clear signal.")))
+                }
+                requestIfAuthorized()
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.cancel() }
+        }
+    }
+    private func requestIfAuthorized() {
+        guard pending != nil else { return }
+        switch manager.authorizationStatus {
+        case .notDetermined: manager.requestWhenInUseAuthorization()
+        case .authorizedAlways, .authorizedWhenInUse: manager.requestLocation()
+        default:
+            finish(.failure(ClientError.message("Enable Location for Takeoff in iPhone Settings to start trips from where you are.")))
+        }
+    }
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) { requestIfAuthorized() }
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard pending != nil else { return }
+        guard let location = locations.last, location.horizontalAccuracy >= 0, location.horizontalAccuracy <= 1000,
+              abs(location.timestamp.timeIntervalSinceNow) <= 60, CLLocationCoordinate2DIsValid(location.coordinate) else {
+            finish(.failure(ClientError.message("Your location is too old or approximate for routing. Enable Precise Location for Takeoff and try again."))); return
+        }
+        finish(.success(TripPoint(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)))
+    }
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        finish(.failure(ClientError.message("Couldn't get your current location. Check Location Services and try again.")))
+    }
+    func cancel() { finish(.failure(CancellationError())) }
+    private func finish(_ result: Result<TripPoint, Error>) {
+        let continuation = pending
+        pending = nil
+        timeout?.cancel(); timeout = nil
+        manager.stopUpdatingLocation()
+        continuation?.resume(with: result)
+    }
+}

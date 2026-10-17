@@ -63,6 +63,9 @@ actor APIClient {
         try await request("PUT", path, body: APIJSON.encoder().encode(body))
     }
     func post<T: Decodable>(_ path: String) async throws -> T { try await request("POST", path, body: Data("{}".utf8)) }
+    func post<T: Decodable, Body: Encodable>(_ path: String, body: Body) async throws -> T {
+        try await request("POST", path, body: APIJSON.encoder().encode(body))
+    }
 
     private func save(_ value: SessionTokens) throws {
         try storage.write(APIJSON.encoder().encode(value), account: "session")

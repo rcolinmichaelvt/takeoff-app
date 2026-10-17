@@ -2,6 +2,8 @@
 
 This is an incremental update for your working Milestone 3 app. It fixes the actual DG inventory hours format and adds saved, editable trips with Apple Maps handoff. Your four earlier interface changes remain in place.
 
+The current cumulative package includes the 0.4.1 corrections. Also follow [the 0.4.1 guide](MILESTONE_4_1_UPGRADE.md), especially the one-time Xcode location-description edit.
+
 ## 1. Back up the existing Railway database
 
 From the Mac folder linked to your API service:
@@ -57,7 +59,7 @@ npm test
 
 Use **Node 24.x**. Commit/upload the supplied backend files to your existing deployment branch. Reuse the same Railway API service, `/backend` root, one replica and attached `/data` volume. No new credentials, environment variables, paid APIs or services are needed. Keep the current DG session variables and `DG_MONITOR_ENABLED=true`.
 
-Logs should show **Takeoff API v0.4**. The existing `/health/ready` URL should return `{"status":"ready"}`. Startup adds schema 4's private trip table transactionally; existing settings, notes, logins, quantities and timing data remain. A healthy process alone does not verify a successful DG poll.
+Logs should show **Takeoff API v0.4.1**. The existing `/health/ready` URL should return `{"status":"ready"}`. Startup adds schema 4's private trip table transactionally; existing settings, notes, logins, quantities and timing data remain. A healthy process alone does not verify a successful DG poll.
 
 Do not run older backend code against schema 4. If rollback is necessary, use the protected pre-upgrade backup and offline restore preparation. Restore preparation revokes old sessions as described in the recovery guide.
 
@@ -67,7 +69,7 @@ Do not run older backend code against schema 4. If rollback is necessary, use th
 2. Keep the Takeoff scheme, Personal Team, bundle identifier and your connected iPhone selected.
 3. Press **Command-R**. Keep the installed app; no new target, capability or Swift package is required.
 4. Confirm the new **Trips** tab appears.
-5. For the ten included native checks, select an iPhone simulator and press **Command-U**. The tests do not log into your account or transfer phone access.
+5. For the 11 included native checks, select an iPhone simulator and press **Command-U**. The tests do not log into your account or transfer phone access.
 
 If Trips says Update Railway after the backend update, close and reopen the app to reload its capabilities. Full Maps route handoff uses iOS 18.4 or later, which includes your iPhone on iOS 26.2. On older supported iOS versions, the button opens just the first stop.
 
@@ -97,15 +99,15 @@ Old batches that started without usable hours remain excluded from clean timing 
 
 1. Open **Trips** and choose all followed items or one specific followed item.
 2. Tap **Suggest a route**. The first suggestion uses up to ten nearby, nonexcluded stores with fresh likely-for-sale stock.
-3. Keep Takeoff open while it checks each drive with Apple Maps. The start is the saved ZIP center. Each later arrival allows five minutes at the preceding stop.
+3. Keep Takeoff open while it checks each drive with Apple Maps. The start is a fresh reading of your current location; allow location access when prompted. Each later arrival allows five minutes at the preceding stop.
 4. Use **Remove stop** or **Add stop**. Either action recalculates the order and drives. Optional back-stock stops must have medium/high-confidence forecasts ready by their estimated arrival; they still display a warning and stay yellow.
 5. Review the numbered map, addresses, arrivals and warnings. A closed-at-arrival, sold-out, unknown or stale stop blocks saving. Remove a warned stop and recalculate. If otherwise available stock has missing hours, the app warns you to check the store.
 6. A valid route saves privately to your account. An unsuccessful edit remains an **Unsaved draft**; the prior saved route is retained. Discard the draft to return to it.
-7. Tap **Open route in Apple Maps**. Takeoff checks current server eligibility again, then sends the saved ZIP start, ordered intermediate stops and final destination. Confirm the stop order in Maps before starting.
+7. Tap **Open route in Apple Maps**. Takeoff checks current server eligibility again, then sends ordered intermediate stops and the final destination; Maps uses current location for the start. Confirm the stop order in Maps before starting.
 
 The route ends at the final store. The suggested order uses geographic distance with local improvements; Apple Maps estimates the actual road travel afterward. It is not an exhaustive traffic-aware fastest-route solver. The ten-stop cap keeps the free pilot's routing work bounded. The in-app map marks the visiting order; Apple Maps supplies navigation.
 
-Driving estimates must be recalculated after 15 minutes. Maps can throttle requests; if that happens, wait a few minutes and recalculate. Unknown road estimates are never replaced with invented driving times. Each recalculation starts from the saved ZIP center, including during a trip; this version does not track your position or automatically mark visited stores.
+Driving estimates must be recalculated after 15 minutes. Maps can throttle requests; if that happens, wait a few minutes and recalculate. Unknown road estimates are never replaced with invented driving times. Each recalculation requests a fresh current-location fix. The monitored ZIP stays fixed; there is no continuous tracking or automatic visited-stop detection. A move of more than 250 meters since planning requires recalculation.
 
 ## 7. Trip changes and alerts
 
@@ -113,9 +115,9 @@ The server watches the saved trip for 12 hours after its departure time. Meaning
 
 The app refreshes while active and catches up on reopening. Return to Trips, review changes, and replan when needed. The server cannot rewrite a route already being navigated in Apple Maps. Clear an outdated/finished trip when you are done. APNs phone pushes still belong to Milestone 5; the free local build has inbox alerts.
 
-## Why a decrease after an outage can remain unknown
+## Decreases after an outage in version 0.4.1
 
-Yes: if the monitor missed the initial increase, it has no tracked pending-new-stock threshold. A positive first/restarted observation becomes an unknown baseline. A later fresh decrease may create an ordinary Stock decreased event when enabled, but the stock stays gray. A clean observed increase and qualifying decrease are needed to mark the new batch likely for sale and measure its restock time. A fresh zero remains sold out. No historical arrival or sample is invented from the outage.
+A positive baseline remains unknown until a decrease is observed. A decrease with units remaining now marks Likely in stock even if the initial increase was missed, including a lower live quantity observed across an outage. The green signal expires seven days after the latest decrease, and stale data becomes unknown sooner. Restock timing still requires a clean observed increase and qualifying new-batch sale; no historical arrival or sample is invented. A fresh zero remains sold out.
 
 ## Live acceptance checks
 

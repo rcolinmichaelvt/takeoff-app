@@ -1,8 +1,8 @@
-# Milestone 4 changed and added files
+# Milestone 4 cumulative files
 
-Incremental update for Milestone 3. Merge these files into the existing repository. No files are deleted.
+Cumulative update for Milestone 3, including the 0.4.1 corrections. Merge matching files; no files are deleted. Follow both upgrade guides.
 
-The ZIP excludes your AppConfiguration.swift, Xcode project, Info.plist, product catalog, environment secrets, database and Git metadata.
+The archive excludes API configuration, the Xcode signing project, Info.plist, catalog, secrets, databases and Git metadata. Update the location permission description manually using the upgrade guide.
 
 ## Backend
 
@@ -26,21 +26,28 @@ The ZIP excludes your AppConfiguration.swift, Xcode project, Info.plist, product
 - `backend/test/app-data.test.js`
 - `backend/test/intelligence.test.js`
 - `backend/test/milestone3-upgrade.test.js`
+- `backend/test/milestone4-followup.test.js`
 - `backend/test/milestone4-hours.test.js`
 - `backend/test/server.test.js`
 - `backend/test/trips.test.js`
 
 ## iPhone app
 
+- `ios/Takeoff/APIClient.swift`
 - `ios/Takeoff/AppModel.swift`
 - `ios/Takeoff/FavoritesView.swift`
+- `ios/Takeoff/LocationPicker.swift`
 - `ios/Takeoff/Models.swift`
 - `ios/Takeoff/SettingsView.swift`
+- `ios/Takeoff/StoreDetailView.swift`
 - `ios/Takeoff/TakeoffApp.swift`
 - `ios/TakeoffTests/ProtocolTests.swift`
 
 ## Guides
 
+- `docs/FUTURE_FEATURES.md`
+- `docs/MILESTONE_4_1_FILES.md`
+- `docs/MILESTONE_4_1_UPGRADE.md`
 - `docs/MILESTONE_4_FILES.md`
 - `docs/MILESTONE_4_UPGRADE.md`
 - `docs/PRODUCT_PLAN.md`

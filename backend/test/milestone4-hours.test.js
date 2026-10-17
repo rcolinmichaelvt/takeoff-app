@@ -63,10 +63,10 @@ test('inventory caches hours before the new batch starts and needs no store-info
   assert.equal(f.appData.store(ALICE, '14838').inventory[0].quantity, 11);
 });
 
-test('a decrease after an unknown restart baseline stays unknown and never trains a fabricated restock', async t => {
+test('a decrease after an unknown restart baseline becomes available without training a fabricated restock', async t => {
   const f = await setup(t); f.observe(0); f.advance(10 * 60_000); f.observe(10);
   f.advance(60_000); f.observe(9);
-  assert.equal(f.appData.store(ALICE, '14838').inventory[0].status, 'unknown');
+  assert.equal(f.appData.store(ALICE, '14838').inventory[0].status, 'available');
   assert.equal(f.appData.intelligence.timing('14838').sampleCount, 0);
   assert.deepEqual(f.db.prepare('SELECT kind FROM events').all().map(e => e.kind), ['decrease']);
 });

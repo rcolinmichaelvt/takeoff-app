@@ -184,7 +184,6 @@ private struct StockRow: View {
                     } else { Text(forecast.explanation).font(.caption) }
                 }.foregroundStyle(.secondary)
             }
-            Text("Checked \(stock.observedAt, format: .dateTime.month().day().hour().minute())").font(.caption2).foregroundStyle(.secondary)
             if let increase = stock.lastIncreaseAt { Text("Last increase: \(increase, format: .dateTime.month().day().hour().minute())").font(.caption2).foregroundStyle(.secondary) }
             if let decrease = stock.lastDecreaseAt { Text("Last decrease: \(decrease, format: .dateTime.month().day().hour().minute())").font(.caption2).foregroundStyle(.secondary) }
         }.padding(.vertical, 8)
@@ -221,20 +220,17 @@ private struct RestockTimingSection: View {
             if let hours = timing.openingHours {
                 DisclosureGroup("Regular store hours") {
                     ForEach(hours.days) { day in LabeledContent(day.day.capitalized, value: day.hours).font(.caption) }
-                    Text("Store timezone: \(hours.timezone)").font(.caption).foregroundStyle(.secondary)
-                    Text("Updated \(hours.updatedAt, style: .relative) ago. Published date exceptions are used by predictions.")
-                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
-            if let travel {
-                Text("Departure warnings use a saved Apple Maps drive estimate, checked \(travel.updatedAt, style: .relative) ago.")
+            if travel != nil {
+                Text("Departure warnings use a saved Apple Maps drive estimate from your ZIP.")
                     .font(.caption).foregroundStyle(.secondary)
             } else {
                 Text("A recent drive estimate from your saved ZIP is needed for departure warnings.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         } header: { Text("Restock timing") } footer: {
-            Text("Only opening hours count. Estimates do not confirm shelf availability. Product prediction times use the store's timezone.")
+            Text("Only opening hours count. Estimates do not confirm shelf availability.")
         }
     }
 }

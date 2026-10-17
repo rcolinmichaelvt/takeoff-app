@@ -2,7 +2,7 @@
 
 Takeoff includes a real SwiftUI project at `ios/Takeoff.xcodeproj`. Open that project directly. The app targets **iPhone, iOS 17.0 or later**, uses Swift 5 language mode, and has no external Swift packages. Your reported iPhone on iOS 26.2 meets the deployment target. Xcode still needs the appropriate device support installed locally.
 
-The source and project structure were checked in a Linux workspace. **An Xcode build and on-device run have not been performed here.** The included ten XCTest cases are ready to run on your Mac.
+The source and project structure were checked in a Linux workspace. **An Xcode build and on-device run have not been performed here.** The included 11 XCTest cases are ready to run on your Mac.
 
 ## 1. Upgrade your existing Railway backend first
 
@@ -67,16 +67,16 @@ Official references: [running on a device](https://developer.apple.com/documenta
 2. Enter one five-digit US ZIP, or tap **Use current location for ZIP**. Location fills the field once; press Save/Start to commit it. Traveling later will not move your monitoring area.
 3. Select your products from the curated catalog and tap **Start exploring**. Selecting no products creates no monitoring work for your account.
 4. Open **Discover**. Use the list/map toggle, item filter, and **Your area / All covered areas** control. The app refreshes approximately every 30 seconds while active; you can refresh manually.
-5. Tap a store. Check product quantities and observation times, favorite/exclude it, and save a private note. Moderators can separately save a public note. Drive estimates are requested from your saved ZIP's center, on demand and gradually during foreground refresh. They can be unavailable. Store details also show opening-hours timing, confidence, and forecasts as clean samples accumulate.
+5. Tap a store. Check product quantities and last increase/decrease times, favorite/exclude it, and save a private note. Moderators can separately save a public note. Drive estimates are requested from your saved ZIP's center, on demand and gradually during foreground refresh. They can be unavailable. Store details also show opening-hours timing, confidence, and forecasts as clean samples accumulate.
 6. Open **Inbox** for changes selected by your alert preferences from the last seven days. In **Settings → Alerts & pause**, choose event types or pause notifications. Paused events remain in the inbox.
 
-A green pin means at least one filtered product is likely for sale; yellow means back stock when no filtered product is green; gray means uncertain data when neither green nor yellow applies; red means all observed filtered products are sold out. The store detail shows each observed product separately. Initial positive observations are gray until enough changes are observed. Observations older than nine minutes, or without an active subscription covering them, also show unknown.
+A green pin means at least one filtered product is likely for sale; yellow means back stock when no filtered product is green; gray means uncertain data when neither green nor yellow applies; red means all observed filtered products are sold out. The store detail shows each observed product separately. Initial positive observations are gray until a decrease with units remaining. Green expires seven days after the latest decrease, and unchanged polls do not extend it. Observations older than nine minutes, or without an active subscription covering them, also show unknown.
 
 The server uses DG coordinates if supplied. Otherwise it resolves public store addresses using the US Census geocoder. This runs separately from stock polling. Some addresses may not resolve; those stores still appear in the list when their distance is known. Geocoded coordinates are labeled in details. Use the Trips tab to suggest a one-way route, edit stops, and open it in Apple Maps. Full route handoff uses iOS 18.4 or later; older supported iOS opens only the first stop.
 
 ## 6. Run the included iOS checks
 
-Choose an installed **iPhone simulator** as the destination, keep the **Takeoff** scheme selected, then press **Command-U**. The ten tests cover:
+Choose an installed **iPhone simulator** as the destination, keep the **Takeoff** scheme selected, then press **Command-U**. The 11 tests cover:
 
 - Exact request-signing bytes and verification of a Node-generated P-256 DER signature.
 - Callback origin/state validation and rejection of duplicate login codes.
@@ -86,6 +86,7 @@ Choose an installed **iPhone simulator** as the destination, keep the **Takeoff*
 - Older inbox payloads without address/prediction fields remaining readable.
 - Ordered Maps waypoints and the final one-way destination.
 - Rejection of invalid coordinates, empty routes, and more than ten stops.
+- Seven-day availability expiry while observation timestamps are still fresh.
 - Older alert preferences retaining choices while defaulting Trip changes on.
 - Preview requests omitting unmeasured legs and owner fields.
 

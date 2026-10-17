@@ -3,6 +3,7 @@ import SwiftUI
 import AuthenticationServices
 import UIKit
 import MapKit
+import CoreLocation
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -33,6 +34,7 @@ final class AppModel: ObservableObject {
     private var tripVersion = 0
     private var tripGeneration = UUID()
     private var tripRequest: MKDirections?
+    private let tripLocation = TripLocationProvider()
     private var api: APIClient?
     private var pendingHandoff: LoginHandoff?
     private let webSignIn = WebSignIn()
@@ -265,13 +267,13 @@ final class AppModel: ObservableObject {
 
 extension AppModel {
     func cancelTripPlanning() {
-        tripGeneration = UUID(); tripRequest?.cancel()
+        tripGeneration = UUID(); tripRequest?.cancel(); tripLocation.cancel()
     }
     func loadTripCandidates(products: [String]) async {
-        guard !tripBusy, phase == .signedIn else { return }
+        guard !tripBusy, phase == .signedIn, let origin = (tripDraft ?? trip)?.originPoint else { return }
         let account = member?.discordId
         do {
-            let preview: TripPreview = try await client().post("/v1/trip/preview", body: TripRequest(products: products, storeIds: []))
+            let preview: TripPreview = try await client().post("/v1/trip/preview", body: TripRequest(products: products, storeIds: [], origin: origin))
             guard phase == .signedIn, member?.discordId == account else { return }
             tripCandidates = preview.candidates
         } catch { await report(error) }
@@ -287,19 +289,23 @@ extension AppModel {
         let account = member?.discordId
         defer { tripBusy = false; tripProgress = nil; tripRequest = nil; revision += 1 }
         do {
+            tripProgress = "Finding your current location…"
+            let origin = try await tripLocation.currentPoint()
+            try Task.checkCancellation()
+            guard tripGeneration == generation, phase == .signedIn, member?.discordId == account else { return }
             let api = try client()
             let saved: TripResponse = try await api.get("/v1/trip")
             try Task.checkCancellation()
             guard tripGeneration == generation, phase == .signedIn, member?.discordId == account else { return }
             trip = saved.trip; tripVersion = saved.version
             tripProgress = "Finding an efficient stop order…"
-            var request = TripRequest(products: products, storeIds: storeIds)
+            var request = TripRequest(products: products, storeIds: storeIds, origin: origin)
             let preview: TripPreview = try await api.post("/v1/trip/preview", body: request)
             try Task.checkCancellation()
             guard tripGeneration == generation, phase == .signedIn, member?.discordId == account else { return }
             tripDraft = preview.trip; tripCandidates = preview.candidates
             guard !preview.trip.stops.isEmpty else {
-                message = "No fresh, likely-for-sale stores match these items. You can check Add stop for predicted arrivals."; return
+                message = "No stores with fresh likely-in-stock items match this route. You can check Add stop for predicted arrivals."; return
             }
             var legs: [TripLeg] = [], from = preview.trip.originPoint
             var departure = preview.trip.departureAt
@@ -361,21 +367,30 @@ extension AppModel {
         guard !tripBusy, tripDraft == nil, phase == .signedIn else { return }
         tripBusy = true; revision += 1
         let account = member?.discordId
-        defer { tripBusy = false; revision += 1 }
+        let generation = UUID(); tripGeneration = generation
+        defer { tripBusy = false; tripProgress = nil; revision += 1 }
         do {
+            tripProgress = "Checking your current location…"
+            let origin = try await tripLocation.currentPoint()
+            guard tripGeneration == generation, phase == .signedIn, member?.discordId == account else { return }
             let response: TripResponse = try await client().get("/v1/trip")
-            guard phase == .signedIn, member?.discordId == account, UIApplication.shared.applicationState == .active else { return }
+            guard tripGeneration == generation, phase == .signedIn, member?.discordId == account, UIApplication.shared.applicationState == .active else { return }
             trip = response.trip; tripVersion = response.version
             guard let plan = response.trip, plan.isCurrent() else {
                 message = "The trip needs a fresh check. Review the warnings and tap Recalculate."; return
             }
+            let distance = CLLocation(latitude: origin.latitude, longitude: origin.longitude).distance(from:
+                CLLocation(latitude: plan.origin.latitude, longitude: plan.origin.longitude))
+            guard distance <= 250 else {
+                message = "Your starting location changed. Tap Recalculate to update the order and arrival times from where you are now."; return
+            }
             if #available(iOS 18.4, *) {
                 let stops = plan.stops.compactMap(\.point)
-                guard stops.count == plan.stops.count, let url = TripMaps.url(origin: plan.originPoint, stops: stops) else { return }
+                guard stops.count == plan.stops.count, let url = TripMaps.url(stops: stops) else { return }
                 let opened = await UIApplication.shared.open(url)
                 if !opened { message = "Apple Maps couldn't open this route. Try again from Trips." }
             } else if let first = plan.stops.first?.point {
-                let source = MKMapItem(placemark: MKPlacemark(coordinate: plan.originPoint.coordinate))
+                let source = MKMapItem.forCurrentLocation()
                 let destination = MKMapItem(placemark: MKPlacemark(coordinate: first.coordinate))
                 MKMapItem.openMaps(with: [source, destination], launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving])
             }

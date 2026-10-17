@@ -16,17 +16,17 @@ Local app tests can use foreground refresh and the server inbox before Milestone
 
 ## Location, products, and shared coverage
 
-Each user saves one US ZIP code with a fixed 25-mile radius. Resolve it to a center coordinate on the server. Current location is an optional picker for that ZIP, not continuous tracking. Moving the phone does not silently move the monitored area. Forecast alert driving estimates start from the saved ZIP center.
+Each user saves one US ZIP code with a fixed 25-mile radius. Resolve it to a center coordinate on the server. Current location is an optional picker for that ZIP and a one-time origin for Trips, not continuous tracking. Moving the phone does not silently move the monitored area. Forecast alert driving estimates start from the saved ZIP center.
 
 The operator maintains approved UPCs and titles. Users choose any number of the listed products; they do not type arbitrary titles/UPCs into the app. The catalog begins with the active items in the current DG monitor. No announcements editor or admin dashboard is being built now.
 
-Monitor only areas and products supported by active users' selections. Deduplicate identical ZIP+UPC polls and share store/product snapshots across overlapping regions. Distinct ZIP centers still need their own area queries; unchanged observations do not create duplicate alerts. Members can browse already-covered areas, including coverage created by another member; their own alerts follow their ZIP/product settings. When coverage loses its final subscriber, stop its extra polling and mark old observations stale. Do not imply stale data is current stock.
+Monitor only areas and products supported by active users' selections. Deduplicate identical ZIP+UPC polls and share store/product snapshots across overlapping regions. Distinct ZIP centers still need their own area queries; unchanged observations do not create duplicate alerts. Members can browse already-covered areas, including coverage created by another member; their own alerts follow their ZIP/product settings. When coverage loses its final subscriber, stop its extra polling, remove stores unique to it from All covered areas, and mark cached observations stale. Do not imply stale data is current stock.
 
 Retain the existing nominal polling cadence: every three minutes normally, every ten seconds for qualifying recently increased products for up to 72 hours while stock remains, with staggered work. Preserve timeout, error handling, and provider backoff. A provider error is never a zero-stock observation. Multi-area load and any upstream constraints need measurement before a broader rollout.
 
 ## Inventory inference
 
-Stock increases indicate scanned-in stock, generally still in the back. A qualifying first decrease indicates that the newly arrived stock is likely being sold. This is an inference, not direct confirmation from a shelf sensor.
+Stock increases indicate scanned-in stock, generally still in the back. Any observed decrease with units remaining marks the product Likely in stock, even if the increase was missed. Green expires seven days after the latest decrease; unchanged polls and increases do not extend it. Stale observations still become unknown sooner. The new-stock threshold remains only for restock timing and qualifying new-stock alerts. This is an inference, not direct confirmation from a shelf sensor.
 
 When an increase arrives while older stock is already available, older sales do not count as the new batch reaching the floor. The accepted example is:
 
@@ -34,13 +34,13 @@ When an increase arrives while older stock is already available, older sales do 
 | --- | --- | --- |
 | 3 already available, then +12 → 15 total | Older stock remains available; new batch pending | Green |
 | 15 → 14 → 13 | Older stock is selling; new batch unconfirmed | Green |
-| 13 → 12 | Older available quantity exhausted; new batch unconfirmed | Yellow |
+| 13 → 12 | Decrease supports availability; new batch timing is still pending | Green |
 | 12 → 11 | Quantity crossed the new-batch threshold; new stock is selling | Green |
 | A fresh successful observation reaches 0 | Sold out | Red |
 
 The restock timing sample runs from the **new increase** until the first qualifying sale of that new batch. It does not stop on a decrease that merely consumes older available stock. Multiple deliveries, missed observations, and monitoring gaps must retain uncertainty rather than inventing a clean timing sample.
 
-Early monitoring with stock already present has an unknown shelf state: use gray and wording such as “Availability unknown—monitoring started recently.” Old cached observations are also not evidence of present availability. Show quantities separately from inferred shelf status.
+Early monitoring with stock already present has an unknown shelf state: use gray and wording such as “Availability unknown—monitoring started recently.” A subsequent positive-quantity decrease makes it green without inventing a timing sample. A lower positive quantity first observed across a gap also supports availability, but the gap invalidates timing. Old cached observations are not evidence of present availability. Show quantities separately from inferred shelf status.
 
 ## Store timing and predictions
 
@@ -60,7 +60,7 @@ For a 2:00 PM prediction and a 20-minute drive, notify at **1:35 PM**. This is t
 
 Map filters cover all items, specific selected items, and all stores. Tapping a store pin shows that store's products with individual states: yellow for inferred back stock, green for likely available stock, red for observed sold out, gray for unknown/stale status. Use text and symbols as well as color.
 
-Store details include address, phone number, distance, driving time when available, freshness, and relevant last increase/decrease timestamps. Add favorites and excluded stores. User notes are private; moderator notes are visible publicly to authorized members. A moderator role is assigned by Discord ID. No admin control panel is included now.
+Store details include address, phone number, distance, driving time when available, freshness warnings, and relevant last increase/decrease timestamps. Hide timezone and update/check timestamps; keep weekly opening hours and internal timezone calculations. Add favorites and excluded stores. User notes are private; moderator notes are visible publicly to authorized members. A moderator role is assigned by Discord ID. No admin control panel is included now.
 
 ## Notifications and history
 
@@ -86,8 +86,8 @@ Deferred: Whop/payment entitlements, announcements and Pokémon update publishin
 
 ## Milestone 4 implementation choices
 
-Trips start at the saved ZIP center, use selected followed products, and consider fresh stores within that area. Suggestions start with likely-for-sale stores, using nearest-neighbour ordering and bounded 2-opt improvement by geographic distance. Sequential MapKit road estimates check the resulting route; this is not a guarantee of the fastest road route. Optional back-stock stops need medium/high confidence and a predicted time no later than road arrival. Closed-at-arrival stops block saving; missing hours on an otherwise available store produce a warning.
+Trips start at a fresh one-time device location, use selected followed products, and consider fresh stores within that area. Suggestions start with likely-for-sale stores, using nearest-neighbour ordering and bounded 2-opt improvement by geographic distance. Sequential MapKit road estimates check the resulting route; this is not a guarantee of the fastest road route. Optional back-stock stops need medium/high confidence and a predicted time no later than road arrival. Closed-at-arrival stops block saving; missing hours on an otherwise available store produce a warning.
 
-One active trip is stored privately per account, with version checks against stale edits. Editing or recalculating starts a new plan from the saved ZIP, without GPS tracking. Estimates expire for handoff after 15 minutes. The server watches meaningful stop changes for 12 hours after departure, under the Trip changes switch (on by default); pause retains inbox events. A completed/outdated route can be cleared. A valid saved trip remains until replaced or cleared.
+One active trip is stored privately per account, with version checks against stale edits. Editing or recalculating requests a new current-location fix without changing the monitored ZIP. No background or continuous location tracking is used. Permission failures do not fall back to the ZIP. Maps uses current location for navigation; a move of more than 250 meters since planning requires recalculation. Older ZIP-origin trips also require recalculation. Estimates expire for handoff after 15 minutes. The server watches meaningful stop changes for 12 hours after departure, under the Trip changes switch (on by default); pause retains inbox events. A completed/outdated route can be cleared. A valid saved trip remains until replaced or cleared.
 
-Hours come from `hrsMon`–`hrsSun` in normal inventory responses; no separate store-info poll runs. Missing/invalid hours cannot produce invented samples. A fresh decrease after an unknown startup/resume baseline stays unknown, because no new-batch threshold was observed. It may create an ordinary decrease inbox event if enabled, but does not train a restock sample.
+Hours come from `hrsMon`–`hrsSun` in normal inventory responses; no separate store-info poll runs. Missing/invalid hours cannot produce invented samples. A decrease with stock remaining after an unknown startup/resume baseline now becomes Likely in stock, with seven-day expiry. It may create an ordinary decrease inbox event if enabled, but does not train a restock sample.

@@ -41,7 +41,10 @@ struct RootView: View {
             }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { model.cancelDriveEstimate(); model.cancelTripPlanning() }
+            if phase != .active { model.cancelDriveEstimate() }
+            // Permission dialogs temporarily make the scene inactive. Let the
+            // location request finish; cancel route work on actual backgrounding.
+            if phase == .background { model.cancelTripPlanning() }
         }
         .alert("Takeoff", isPresented: Binding(get: { model.message != nil }, set: { if !$0 { model.message = nil } })) {
             Button("OK") { model.message = nil }

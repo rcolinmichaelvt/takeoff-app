@@ -65,7 +65,7 @@ test('old available stock must be exhausted before a new batch qualifies as sell
     seen.push(f.appData.store(ALICE, '100').inventory[0].status);
     f.advance(10_000);
   }
-  assert.deepEqual(seen, ['out', 'back', 'available', 'available', 'available', 'available', 'back', 'available']);
+  assert.deepEqual(seen, ['out', 'back', 'available', 'available', 'available', 'available', 'available', 'available']);
   const signals = f.db.prepare("SELECT quantity FROM inventory_history WHERE kind='first_decrease' ORDER BY id").all();
   assert.deepEqual(signals.map(s => s.quantity), [3, 11]);
 });

@@ -87,7 +87,7 @@ struct MonitoringStatus: Decodable {
 enum ShelfStatus: String, Codable, CaseIterable {
     case available, back, out, unknown
     var title: String {
-        switch self { case .available: return "Likely for sale"; case .back: return "Likely in back"
+        switch self { case .available: return "Likely in stock"; case .back: return "Likely in back"
         case .out: return "Sold out"; case .unknown: return "Unknown" }
     }
     var symbol: String {
@@ -101,13 +101,17 @@ struct StockItem: Decodable, Identifiable {
     var forecast: RestockForecast? = nil
     var id: String { upc }
     func effectiveStatus(at date: Date = Date()) -> ShelfStatus {
-        stale || date.timeIntervalSince(observedAt) > 9 * 60 ? .unknown : status
+        if stale || date.timeIntervalSince(observedAt) > 9 * 60 { return .unknown }
+        if status == .available {
+            guard let decrease = lastDecreaseAt, date >= decrease, date.timeIntervalSince(decrease) < 7 * 24 * 60 * 60 else { return .unknown }
+        }
+        return status
     }
     var explanation: String {
         if stale || Date().timeIntervalSince(observedAt) > 9 * 60 { return "Last known quantity. Waiting for a fresh observation." }
-        if status == .unknown { return "Availability unknown—monitoring started recently or was interrupted." }
+        if effectiveStatus() == .unknown { return "Availability unknown—no recent sale signal, or monitoring was interrupted." }
         if status == .back { return "An increase was observed; a qualifying sale is still unconfirmed." }
-        if status == .available { return "A qualifying decrease suggests stock is being sold." }
+        if status == .available { return "A decrease with stock remaining suggests items are for sale. This signal expires seven days after the latest decrease." }
         return "The latest successful check reported zero."
     }
 }
@@ -226,7 +230,7 @@ struct TripRequest: Encodable {
     let products: [String]
     var storeIds: [String]? = nil
     var zip: String? = nil
-    var origin: SavedCenter? = nil
+    var origin: TripPoint? = nil
     var legs: [TripLeg]? = nil
     var departureAt: Date? = nil
 }
@@ -243,25 +247,27 @@ struct TripStop: Decodable, Identifiable {
     }
 }
 struct TripPlan: Decodable {
-    let zip: String; let origin: SavedCenter; let products: [String]; let departureAt: Date; let checkedAt: Date
+    let zip: String; let origin: TripPoint; let products: [String]; let departureAt: Date; let checkedAt: Date
+    var originSource: String? = nil
     let stopMinutes: Int; let maxStops: Int; let stops: [TripStop]; let totalDriveSeconds: Int
     let needsReplan: Bool; let canOpen: Bool
     var storeIds: [String] { stops.map(\.id) }
     var originPoint: TripPoint { .init(latitude: origin.latitude, longitude: origin.longitude) }
     func isCurrent(at date: Date = Date()) -> Bool {
-        canOpen && !needsReplan && date.timeIntervalSince(checkedAt) <= 15 * 60 &&
+        originSource == "device" && canOpen && !needsReplan && date.timeIntervalSince(checkedAt) <= 15 * 60 &&
         date.timeIntervalSince(departureAt) <= 15 * 60 && stops.allSatisfy { stop in
             stop.store.inventory.contains { products.contains($0.upc) && $0.quantity > 0 && $0.effectiveStatus(at: date) != .unknown }
         }
     }
 }
 enum TripMaps {
-    static func url(origin: TripPoint, stops: [TripPoint]) -> URL? {
+    static func url(stops: [TripPoint]) -> URL? {
         guard !stops.isEmpty, stops.count <= 10,
-              ([origin] + stops).allSatisfy({ $0.latitude.isFinite && $0.longitude.isFinite && abs($0.latitude) <= 90 && abs($0.longitude) <= 180 }) else { return nil }
+              stops.allSatisfy({ $0.latitude.isFinite && $0.longitude.isFinite && abs($0.latitude) <= 90 && abs($0.longitude) <= 180 }) else { return nil }
         var url = URLComponents()
         url.scheme = "https"; url.host = "maps.apple.com"; url.path = "/directions"
-        url.queryItems = [URLQueryItem(name: "source", value: origin.mapValue), URLQueryItem(name: "mode", value: "driving")]
+        // Omitting source tells Apple Maps to navigate from the current location.
+        url.queryItems = [URLQueryItem(name: "mode", value: "driving")]
         url.queryItems! += stops.dropLast().map { URLQueryItem(name: "waypoint", value: $0.mapValue) }
         url.queryItems!.append(URLQueryItem(name: "destination", value: stops.last!.mapValue))
         return url.url

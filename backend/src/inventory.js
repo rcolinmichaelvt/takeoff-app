@@ -3,15 +3,46 @@ import { milesBetween } from './geography.js';
 import { storeAddress } from './event-display.js';
 import { DAY, normalizeHours } from './hours.js';
 
+export const AVAILABILITY_TTL_MS = 7 * DAY;
+
+// Availability is a recent sale signal; timing still uses the new-batch threshold.
+// Read-time expiry also applies when no poll happens at the seven-day boundary.
+export function inventoryStatus(stock, now) {
+  if (stock.quantity === 0) return 'out';
+  if (stock.status !== 'available') return stock.status;
+  if (Number.isFinite(stock.last_decrease_at) && stock.last_decrease_at <= now &&
+      now - stock.last_decrease_at < AVAILABILITY_TTL_MS) return 'available';
+  return stock.pending_quantity >= stock.quantity ? 'back' : 'unknown';
+}
+
+// Upgrade the old policy's unknown/yellow rows only when the latest recorded change
+// proves a positive-quantity decrease. Never infer a sale from a zero or a gap.
+export function restoreRecentDecreaseSignals(db, now) {
+  db.prepare(`UPDATE inventory SET status='available' WHERE status IN ('unknown','back') AND quantity>0
+    AND last_decrease_at>? AND last_decrease_at<=? AND last_decrease_at>=COALESCE(last_increase_at,0)
+    AND EXISTS (SELECT 1 FROM inventory_history h WHERE h.store_id=inventory.store_id AND h.upc=inventory.upc
+      AND h.created_at=inventory.last_decrease_at AND h.kind='decrease' AND h.quantity>0
+      AND h.id=(SELECT MAX(recent.id) FROM inventory_history recent
+        WHERE recent.store_id=inventory.store_id AND recent.upc=inventory.upc))`)
+    .run(now - AVAILABILITY_TTL_MS, now);
+}
+
 // Shelf inference remains independent of predicted timing: no timed green pins.
 export function observeInventory(previous, quantity, now, maximumGap = 9 * 60_000) {
   const fresh = previous && now >= previous.observed_at && now - previous.observed_at <= maximumGap;
   const next = { quantity, status: quantity === 0 ? 'out' : 'unknown', pending: 0,
     lastIncrease: previous?.last_increase_at ?? null, lastDecrease: previous?.last_decrease_at ?? null,
     kind: previous ? 'resumed' : 'baseline', event: null };
-  if (!fresh) return next;
+  if (!fresh) {
+    // A lower live quantity is still a sale signal after a gap; 'resumed'
+    // invalidates batch timing so this cannot train a fabricated arrival time.
+    if (previous && quantity > 0 && quantity < previous.quantity) {
+      next.status = 'available'; next.lastDecrease = now; next.event = 'decrease';
+    }
+    return next;
+  }
   next.pending = previous.pending_quantity;
-  next.status = previous.status;
+  next.status = inventoryStatus(previous, now);
   next.kind = null;
   const delta = quantity - previous.quantity;
   if (delta > 0) {
@@ -19,15 +50,16 @@ export function observeInventory(previous, quantity, now, maximumGap = 9 * 60_00
     next.pending += delta;
     next.kind = next.event = 'stock_increase';
     next.status = quantity === next.pending || previous.status === 'back' || previous.quantity === 0
-      ? 'back' : previous.status === 'available' ? 'available' : 'unknown';
+      ? 'back' : next.status === 'available' ? 'available' : 'unknown';
   } else if (delta < 0) {
     next.lastDecrease = now;
+    next.status = 'available';
     next.kind = next.event = 'decrease';
     if (next.pending > 0 && quantity < next.pending) {
       next.pending = 0;
       next.status = 'available';
       next.kind = next.event = 'first_decrease';
-    } else if (next.pending > 0 && quantity === next.pending) next.status = 'back';
+    }
   }
   if (quantity === 0) {
     next.status = 'out'; next.pending = 0;

@@ -2,15 +2,15 @@
 
 A private Dollar General monitoring backend and a SwiftUI iPhone app.
 
-**Milestone 4 source is ready for local iPhone testing.** It includes the Xcode project, Discord sign-in, a saved ZIP and curated product selections, map/list views, store details, favorites/exclusions, private and moderator notes, a seven-day history/inbox, and the supporting server worker/API.
+**Milestone 4.1 fixes are ready for local iPhone testing.** It includes the Xcode project, Discord sign-in, a saved ZIP and curated product selections, map/list views, store details, favorites/exclusions, private and moderator notes, a seven-day history/inbox, and the supporting server worker/API.
 
-The backend polls only subscribed ZIP/product pairs, keeps DG credentials and classification on the server, and preserves data on the existing Railway volume. Shelf inference follows the agreed old-stock/new-stock threshold. Restock batches now learn store-specific opening-hours averages, confidence, and arrival-day patterns. Railway schedules approaching-time inbox events from forecasts and per-account drive estimates. Store hours are captured directly from the inventory response (`hrsMon`–`hrsSun`). Trips suggest an editable one-way order, check Apple Maps drive times and arrival warnings, save privately, and hand off to Apple Maps. The physical iPhone client uses a Secure Enclave signing key and device-only Keychain session storage.
+The backend polls only subscribed ZIP/product pairs, keeps DG credentials and classification on the server, and preserves data on the existing Railway volume. A positive-quantity decrease marks stock likely available for up to seven days, subject to freshness. The old-stock/new-stock threshold controls restock timing. Restock batches now learn store-specific opening-hours averages, confidence, and arrival-day patterns. Railway schedules approaching-time inbox events from forecasts and per-account drive estimates. Store hours are captured directly from the inventory response (`hrsMon`–`hrsSun`). Trips start at current location and suggest an editable one-way order, check Apple Maps drive times and arrival warnings, save privately, and hand off to Apple Maps. The physical iPhone client uses a Secure Enclave signing key and device-only Keychain session storage.
 
 **APNs, App Attest, TestFlight distribution, and payments are later milestones.** This build refreshes while open and retrieves missed alerts on reopening. It does not send phone push notifications.
 
 ## Start here
 
-1. [Upgrade your existing Railway service](docs/MILESTONE_4_UPGRADE.md).
+1. [Upgrade your existing Railway service](docs/MILESTONE_4_1_UPGRADE.md).
 2. [Open the project and run it in Xcode](docs/XCODE_TESTING.md).
 3. Set the HTTPS URL in `ios/Takeoff/AppConfiguration.swift`, choose your Personal Team/bundle ID, and run the **Takeoff** scheme on your iPhone.
 
