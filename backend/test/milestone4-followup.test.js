@@ -71,10 +71,10 @@ test('existing recent M4 unknown decreases are repaired on reopen without new ev
   assert.equal(app.store(ALICE, '100').inventory[0].status, 'available');
   assert.equal(f.db.prepare('SELECT COUNT(*) n FROM events').get().n, before);
   assert.equal(app.intelligence.timing('100').sampleCount, 0);
-  // An intervening gap invalidates old policy repair.
+  // An unchanged observation after a gap now preserves the recent sale signal.
   f.advance(10 * 60_000); f.observe(9);
   const afterGap = new AppData({ ...f, catalog: loadCatalog() });
-  assert.equal(afterGap.store(ALICE, '100').inventory[0].status, 'unknown');
+  assert.equal(afterGap.store(ALICE, '100').inventory[0].status, 'available');
 });
 
 test('unselected ZIPs disappear from covered pages; overlap and saved notes survive', async t => {
@@ -122,4 +122,32 @@ test('the last subscriber leaving stops polling; an in-flight response cannot re
   assert.equal(f.db.prepare('SELECT COUNT(*) n FROM monitor_jobs').get().n, 0);
   assert.equal(f.db.prepare('SELECT COUNT(*) n FROM zip_regions').get().n, 2);
   await monitor.stop();
+});
+
+test('unchanged gap preserves back stock and recent sale signals, but cannot extend a seven-day sale signal', () => {
+  const back = { quantity: 2, status: 'back', pending_quantity: 2, observed_at: 1000, last_increase_at: 1000 };
+  const same = observeInventory(back, 2, 1000 + 12 * 60 * 60_000);
+  assert.equal(same.status, 'back'); assert.equal(same.pending, 2); assert.equal(same.event, null);
+  assert.equal(observeInventory(back, 3, 1000 + 600_000).status, 'unknown');
+  const selling = { ...back, status: 'available', pending_quantity: 0, last_decrease_at: 1000 };
+  assert.equal(observeInventory(selling, 2, 1000 + AVAILABILITY_TTL_MS - 1).status, 'available');
+  assert.equal(observeInventory(selling, 2, 1000 + AVAILABILITY_TTL_MS).status, 'unknown');
+});
+
+test('old unchanged resumed rows repair back stock only with consistent retained history, without events or timing', async t => {
+  for (const changed of [false, true]) await t.test(changed ? 'changed gap stays unknown' : 'unchanged gap restores back', async t => {
+    const f = await setup(t); f.observe(0); f.observe(2);
+    f.advance(10 * 60_000);
+    const quantity = changed ? 3 : 2;
+    f.db.prepare("UPDATE inventory SET quantity=?,status='unknown',pending_quantity=0,observed_at=?").run(quantity, f.clock());
+    f.db.prepare("INSERT INTO inventory_history (store_id,upc,previous_quantity,quantity,status,kind,created_at) VALUES (?,?,2,?,'unknown','resumed',?)")
+      .run('100', UPC, quantity, f.clock());
+    f.db.prepare('UPDATE area_inventory SET seen_at=?').run(f.clock());
+    const before = f.db.prepare('SELECT COUNT(*) n FROM events').get().n;
+    const app = new AppData({ ...f, catalog: loadCatalog() });
+    assert.equal(app.store(ALICE, '100').inventory[0].status, changed ? 'unknown' : 'back');
+    assert.equal(app.history('100').history.filter(e => e.kind === 'resumed').length, changed ? 1 : 0);
+    assert.equal(f.db.prepare('SELECT COUNT(*) n FROM events').get().n, before);
+    assert.equal(app.intelligence.timing('100').sampleCount, 0);
+  });
 });

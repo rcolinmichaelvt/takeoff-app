@@ -1,6 +1,6 @@
 # Takeoff backend setup
 
-This guide covers a fresh backend deployment and recovery. If Railway is already set up with Milestone 3, use [the Milestone 4 upgrade guide](../docs/MILESTONE_4_UPGRADE.md), then [the Xcode guide](../docs/XCODE_TESTING.md). The native iPhone client is now included. There is no fake-login bypass in the running server.
+This guide covers a fresh backend deployment and recovery. For an existing Milestone 4.1 deployment, use [the calendar upgrade guide](../docs/CALENDAR_UPGRADE.md), then [the Xcode guide](../docs/XCODE_TESTING.md). Older deployments should first apply their corresponding milestone upgrades. The native iPhone client is now included. There is no fake-login bypass in the running server.
 
 ## 1. Keep the source private
 

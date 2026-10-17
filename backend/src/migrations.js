@@ -1,4 +1,4 @@
-export const latestSchemaVersion = 4;
+export const latestSchemaVersion = 5;
 
 export const migration2 = `
 CREATE TABLE zip_regions (
@@ -144,4 +144,38 @@ CREATE TABLE active_trips (
   updated_at INTEGER NOT NULL
 ) STRICT;
 PRAGMA user_version = 4;
+`;
+
+export const migration5 = `
+CREATE TABLE calendar_events (
+  id TEXT PRIMARY KEY,
+  owner_id TEXT NOT NULL REFERENCES users(discord_id),
+  visibility TEXT NOT NULL CHECK(visibility IN ('private','moderator')),
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  retailer TEXT NOT NULL,
+  location TEXT NOT NULL,
+  zip TEXT REFERENCES zip_regions(zip),
+  starts_at INTEGER NOT NULL,
+  ends_at INTEGER NOT NULL,
+  timezone TEXT NOT NULL,
+  recurrence TEXT NOT NULL CHECK(recurrence IN ('none','weekly')),
+  repeat_until INTEGER,
+  version INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+) STRICT;
+CREATE INDEX calendar_window ON calendar_events(visibility,starts_at,ends_at);
+CREATE INDEX calendar_owner ON calendar_events(owner_id);
+CREATE TABLE calendar_images (
+  event_id TEXT PRIMARY KEY REFERENCES calendar_events(id) ON DELETE CASCADE,
+  jpeg BLOB NOT NULL,
+  width INTEGER NOT NULL,
+  height INTEGER NOT NULL
+) STRICT;
+CREATE TABLE calendar_preferences (
+  discord_id TEXT PRIMARY KEY REFERENCES users(discord_id),
+  options_json TEXT NOT NULL
+) STRICT;
+PRAGMA user_version = 5;
 `;

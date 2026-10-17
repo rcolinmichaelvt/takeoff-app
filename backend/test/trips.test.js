@@ -133,8 +133,8 @@ test('trip changes deduplicate across sweeps and restarts, honor the switch and 
 
 test('schema 3 upgrade retains timing, settings and sessions when adding the empty trip table', async t => {
   const f = await setup(t);
-  f.db.exec('DROP TABLE active_trips; PRAGMA user_version=3;'); f.reopen();
-  assert.equal(f.db.prepare('PRAGMA user_version').get().user_version, 4);
+  f.db.exec('DROP TABLE calendar_images; DROP TABLE calendar_events; DROP TABLE calendar_preferences; DROP TABLE active_trips; PRAGMA user_version=3;'); f.reopen();
+  assert.equal(f.db.prepare('PRAGMA user_version').get().user_version, 5);
   assert.equal(f.db.prepare('SELECT COUNT(*) n FROM sessions').get().n, 2);
   assert.equal(f.db.prepare('SELECT COUNT(*) n FROM active_trips').get().n, 0);
   assert.equal(f.db.prepare('SELECT COUNT(*) n FROM store_hours').get().n, 3);

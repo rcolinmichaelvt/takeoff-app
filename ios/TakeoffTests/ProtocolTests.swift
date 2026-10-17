@@ -3,6 +3,29 @@ import CryptoKit
 @testable import Takeoff
 
 final class ProtocolTests: XCTestCase {
+    func testCalendarOccurrencesKeepSeriesDatesAndExclusiveEndDay() throws {
+        let json = #"{"id":"event","occurrenceId":"event:1","source":"moderator","title":"Release","description":"Details","retailer":"Target","location":"Test Street","zip":null,"startsAt":"2026-11-01T14:00:00Z","endsAt":"2026-11-02T00:00:00Z","seriesStartsAt":"2026-10-25T13:00:00Z","seriesEndsAt":"2026-10-25T23:00:00Z","timezone":"America/New_York","recurrence":"weekly","repeatUntil":"2026-11-08T23:00:00Z","version":2,"canEdit":false,"hasImage":true,"updatedAt":"2026-10-17T12:00:00Z"}"#
+        let event = try APIJSON.decoder().decode(CalendarEntry.self, from: Data(json.utf8))
+        var utc = Calendar(identifier: .gregorian); utc.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        XCTAssertTrue(event.isShared); XCTAssertTrue(event.hasImage); XCTAssertFalse(event.canEdit)
+        XCTAssertNotEqual(event.startsAt, event.seriesStartsAt)
+        XCTAssertTrue(event.overlaps(event.startsAt, calendar: utc))
+        XCTAssertFalse(event.overlaps(event.endsAt, calendar: utc), "An event ending at midnight does not occupy the following day")
+    }
+    func testPrivateCalendarRequestOmitsImageAndAccountIdentifiers() throws {
+        let request = CalendarWrite(version: 0, visibility: "private", title: "My stop", description: "", retailer: "Target",
+            location: "Test Street", zip: nil, startsAt: Date(timeIntervalSince1970: 1800000000),
+            endsAt: Date(timeIntervalSince1970: 1800003600), timezone: "America/New_York", recurrence: "none", repeatUntil: nil)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: APIJSON.encoder().encode(request)) as? [String: Any])
+        XCTAssertNil(object["imageBase64"]); XCTAssertNil(object["discordId"]); XCTAssertNil(object["owner_id"])
+        XCTAssertNil(object["repeatUntil"]); XCTAssertEqual(object["visibility"] as? String, "private")
+        XCTAssertEqual(object["startsAt"] as? String, "2027-01-15T08:00:00Z")
+    }
+    func testOlderServerCapabilitiesDoNotEnableCalendar() throws {
+        let data = Data(#"{"monitoring":true,"remotePush":false,"appAttestRequired":false,"trips":true}"#.utf8)
+        let capabilities = try APIJSON.decoder().decode(Member.Capabilities.self, from: data)
+        XCTAssertNil(capabilities.calendar); XCTAssertEqual(capabilities.trips, true)
+    }
     func testMapsURLPreservesOrderedWaypointsAndOneWayDestination() throws {
         let stops = [TripPoint(latitude: 38, longitude: -79), TripPoint(latitude: 39, longitude: -78), TripPoint(latitude: 40, longitude: -77)]
         let url = try XCTUnwrap(TripMaps.url(stops: stops))

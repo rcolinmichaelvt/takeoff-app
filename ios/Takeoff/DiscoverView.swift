@@ -10,6 +10,7 @@ struct DiscoverView: View {
     @State private var productMode = "all"
     @State private var selectedProducts = Set<String>()
     @State private var showProducts = false
+    @State private var showFavorites = false
     private var filter: Set<String>? {
         productMode == "all" ? nil : productMode == "followed" ? Set(model.preferences.products) : selectedProducts
     }
@@ -62,6 +63,9 @@ struct DiscoverView: View {
             }
             .navigationTitle("Takeoff").navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { showFavorites = true } label: { Image(systemName: "star.fill") }.accessibilityLabel("Favorites")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { Task { await model.refresh() } } label: {
                         if model.refreshing { ProgressView() } else { Image(systemName: "arrow.clockwise") }
@@ -70,6 +74,7 @@ struct DiscoverView: View {
             }
             .sheet(item: $selected) { value in NavigationStack { StoreDetailView(storeID: value.id) }.environmentObject(model) }
             .sheet(isPresented: $showProducts) { productFilters }
+            .sheet(isPresented: $showFavorites) { FavoritesView().environmentObject(model) }
             .onAppear { centerMap() }
             .onChange(of: model.preferences.zip) { _, _ in centerMap() }
             .onChange(of: model.scope) { _, _ in centerMap() }

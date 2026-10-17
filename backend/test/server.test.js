@@ -5,6 +5,8 @@ import { createServer, clientIp } from '../src/server.js';
 import { fixture, device, login, signedRequest, ALICE, BOB } from './helpers.js';
 import { randomToken, challengeFor } from '../src/crypto.js';
 import { Inventory } from '../src/inventory.js';
+import sharp from 'sharp';
+import { randomBytes } from 'node:crypto';
 
 async function httpFixture(t) {
   const f = fixture(t);
@@ -27,6 +29,65 @@ async function httpFixture(t) {
   };
   return { ...f, base, errors, appData };
 }
+
+test('clear inbox deletes every old page for its owner, retains arriving alerts and rejects unsigned requests', async t => {
+  const f = await httpFixture(t), a = device(), b = device();
+  const alice = await login(f, a), bob = await login(f, b, BOB);
+  const add = f.db.prepare('INSERT INTO events (discord_id,kind,payload_json,created_at) VALUES (?,?,?,?)');
+  for (let i = 0; i < 125; i++) add.run(ALICE, 'stock_increase', '{}', f.clock());
+  const page = await (await f.request(a, alice.accessToken, '/v1/events')).json();
+  assert.ok(page.nextCursor); const throughId = Math.max(...page.events.map(e => e.id));
+  const other = Number(add.run(BOB, 'sold_out', '{}', f.clock()).lastInsertRowid);
+  const newer = Number(add.run(ALICE, 'sold_out', '{}', f.clock()).lastInsertRowid);
+  assert.equal((await f.post('/v1/events/clear', { throughId })).status, 401);
+  assert.equal((await f.request(device(), alice.accessToken, '/v1/events/clear', { throughId })).status, 401);
+  for (const body of [{ throughId: 0 }, { throughId, discordId: BOB }, { throughId: '125' }]) {
+    assert.equal((await f.request(a, alice.accessToken, '/v1/events/clear', body)).status, 400);
+  }
+  const result = await f.request(a, alice.accessToken, '/v1/events/clear', { throughId });
+  assert.equal(result.status, 200); assert.equal((await result.json()).cleared, 125);
+  const remaining = await (await f.request(a, alice.accessToken, '/v1/events')).json();
+  assert.deepEqual(remaining.events.map(e => e.id), [newer]);
+  const bobs = await (await f.request(b, bob.accessToken, '/v1/events')).json();
+  assert.deepEqual(bobs.events.map(e => e.id), [other]);
+  assert.equal((await (await f.request(a, alice.accessToken, '/v1/events/clear', { throughId })).json()).cleared, 0);
+  assert.equal(f.errors.length, 0);
+});
+
+test('calendar HTTP routes protect images and edits with device proof, roles and exact versions', async t => {
+  const f = await httpFixture(t), a = device(), b = device();
+  const alice = await login(f, a), bob = await login(f, b, BOB);
+  const image = await sharp(randomBytes(300 * 300 * 3), { raw: { width: 300, height: 300, channels: 3 } }).png().toBuffer();
+  const input = { version: 0, visibility: 'moderator', title: 'Release day', description: 'Event details', retailer: 'Target', location: '',
+    startsAt: new Date(f.clock() + 3600_000).toISOString(), endsAt: new Date(f.clock() + 7200_000).toISOString(),
+    timezone: 'America/New_York', recurrence: 'none', imageBase64: image.toString('base64') };
+  assert.ok(JSON.stringify(input).length > 16 * 1024);
+  const query = `/v1/calendar?from=${f.clock()}&to=${f.clock() + 7 * 86400_000}`;
+  assert.equal((await f.get(query)).status, 401);
+  assert.equal((await f.post('/v1/calendar', input)).status, 401);
+  assert.equal((await f.request(device(), alice.accessToken, '/v1/calendar', input)).status, 401);
+  assert.equal((await f.request(b, bob.accessToken, '/v1/calendar', input)).status, 403);
+  const response = await f.request(a, alice.accessToken, '/v1/calendar', input);
+  assert.equal(response.status, 200); const event = await response.json(), url = `/v1/calendar/${event.id}`;
+  assert.equal(event.hasImage, true);
+  assert.equal((await f.get(url + '/image')).status, 401);
+  assert.equal((await f.request(device(), alice.accessToken, url + '/image')).status, 401);
+  const imageResponse = await f.request(b, bob.accessToken, url + '/image');
+  assert.equal(imageResponse.status, 200); assert.equal(imageResponse.headers.get('cache-control'), 'no-store');
+  assert.equal((await f.request(b, bob.accessToken, url, { ...input, version: 1 }, 'PUT')).status, 404);
+  assert.equal((await f.request(a, alice.accessToken, url, { ...input, version: 1 }, 'PUT')).status, 200);
+  assert.equal((await f.request(a, alice.accessToken, url, { ...input, version: 1 }, 'PUT')).status, 409);
+  assert.equal((await f.request(a, alice.accessToken, '/v1/settings', input, 'PUT')).status, 413);
+  assert.equal((await f.request(a, alice.accessToken, '/v1/calendar', { ...input, padding: 'x'.repeat(2 * 1024 * 1024) })).status, 413);
+  const page = await (await f.request(b, bob.accessToken, query)).json();
+  assert.equal(page.events[0].id, event.id); assert.equal(page.events[0].canEdit, false);
+  assert.equal((await f.request(b, bob.accessToken, '/v1/calendar/preferences', { showModerator: false }, 'PUT')).status, 200);
+  assert.equal((await (await f.request(b, bob.accessToken, query)).json()).events.length, 0);
+  assert.equal((await f.request(b, bob.accessToken, url + '/delete', { version: 2 })).status, 404);
+  assert.equal((await f.request(a, alice.accessToken, url + '/delete', { version: 2 })).status, 200);
+  assert.equal((await f.request(a, alice.accessToken, url + '/image')).status, 404);
+  assert.equal(f.errors.length, 0);
+});
 
 test('signed travel endpoints isolate accounts and reject injected owners, changed ZIPs, and copied tokens', async t => {
   const f = await httpFixture(t), alice = device(), bob = device();

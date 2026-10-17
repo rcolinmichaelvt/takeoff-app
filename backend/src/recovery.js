@@ -13,7 +13,7 @@ export async function prepareRestore(source, destination, now = Date.now()) {
   let input, output, reserved = false;
   try {
     input = new DatabaseSync(source, { readOnly: true });
-    if (![1, 2, 3, latestSchemaVersion].includes(input.prepare('PRAGMA user_version').get().user_version) ||
+    if (![1, 2, 3, 4, latestSchemaVersion].includes(input.prepare('PRAGMA user_version').get().user_version) ||
         input.prepare('PRAGMA integrity_check').get().integrity_check !== 'ok' ||
         input.prepare('PRAGMA foreign_key_check').all().length) {
       throw new Error('Backup integrity or schema validation failed.');

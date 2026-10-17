@@ -91,3 +91,18 @@ Trips start at a fresh one-time device location, use selected followed products,
 One active trip is stored privately per account, with version checks against stale edits. Editing or recalculating requests a new current-location fix without changing the monitored ZIP. No background or continuous location tracking is used. Permission failures do not fall back to the ZIP. Maps uses current location for navigation; a move of more than 250 meters since planning requires recalculation. Older ZIP-origin trips also require recalculation. Estimates expire for handoff after 15 minutes. The server watches meaningful stop changes for 12 hours after departure, under the Trip changes switch (on by default); pause retains inbox events. A completed/outdated route can be cleared. A valid saved trip remains until replaced or cleared.
 
 Hours come from `hrsMon`–`hrsSun` in normal inventory responses; no separate store-info poll runs. Missing/invalid hours cannot produce invented samples. A decrease with stock remaining after an unknown startup/resume baseline now becomes Likely in stock, with seven-day expiry. It may create an ordinary decrease inbox event if enabled, but does not train a restock sample.
+
+
+## Approved calendar increment · 0.4.2
+
+The owner selected calendar events before community stock reports, approved an option between favorites and all nearby stores for suggestions, and requested moderator event images and inbox clearing. This increment keeps free Personal Team testing and is separate from the paid-developer Milestone 5.
+
+- Shared moderator calendar posts: title, description, retailer, location, dates, optional area ZIP and image. Blank ZIP shares to all members; a ZIP scopes ordinary viewers to saved centers within 25 miles. Existing moderator Discord IDs govern shared edits.
+- Owner-private events and bounded weekly recurrence. Editing/deleting a series affects every occurrence; no individual-occurrence exceptions yet.
+- Month/day navigation, source filters and a collapsed layer of existing fresh-batch DG forecasts. Favorite stores by default, with all-nearby option; one store/date card grouping products, three cards before expansion. Calendar filters never start more monitoring.
+- Authenticated moderator image loading and server normalization, with SQLite-backed persistence. Moderator calendar images can come from Photos. No new external storage provider.
+- Clear all notifications for the owner's existing inbox, with confirmation and retained stock history/future alerts.
+- Fresh unchanged quantities after observation gaps preserve stock inference. Old unchanged resumed rows are hidden from history, and consistent retained evidence may repair the old back-stock reset. Real open-hours outages still invalidate timing samples.
+- Favorites moves to the star in Discover, leaving five main tabs: Discover, Calendar, Trips, Inbox, Settings.
+
+Community stock posting is deferred explicitly. Its recorded future rule is unverified text-only reports and product evidence captured directly in the app, with no photo-library uploads. Delivery-weekday prediction, notification reminders, Apple Calendar export, new retailer monitoring and broader moderation tools still need their own approved implementation work. Current calendar predictions use observed stock batches; product batch counts are not treated as independent trucks.

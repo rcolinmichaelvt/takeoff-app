@@ -22,8 +22,14 @@ export class Intelligence {
     const end = (reason, state = 'uncertain') => {
       if (batch) this.db.prepare('UPDATE restock_batches SET state=?,reason=?,ended_at=? WHERE id=?').run(state, reason, now, batch.id);
     };
-    if (next.kind === 'resumed' || next.kind === 'baseline') { end('monitoring_gap'); return; }
     const hours = this.hours(storeId);
+    if (next.kind === 'resumed' || next.kind === 'baseline') {
+      const minutes = batch && hours && batch.schedule_json && sameSchedule(JSON.parse(batch.schedule_json), hours.schedule)
+        ? openMinutes(hours.schedule, previous?.observed_at, now) : null;
+      if (next.kind === 'resumed' && previous?.quantity === next.quantity && minutes !== null &&
+          minutes <= this.config.monitor.staleAfterMs / 60_000) return;
+      end('monitoring_gap'); return;
+    }
     if (next.event === 'stock_increase') {
       const overlap = !!batch || previous.pending_quantity > 0;
       end('overlapping_deliveries');
@@ -97,17 +103,22 @@ export class Intelligence {
     const now = this.clock();
     // Cancel uncertainty even before the next provider response or during backoff.
     const covered = appData.coverage();
+    const active = appData.coverage({ freshOnly: false });
     const batches = this.db.prepare(`SELECT b.*,i.quantity stock_quantity,i.pending_quantity,i.observed_at,i.status
       FROM restock_batches b JOIN inventory i ON i.store_id=b.store_id AND i.upc=b.upc WHERE b.state='pending'`).all();
     transaction(this.db, () => {
       for (const batch of batches) {
-        if (!covered.has(`${batch.store_id}:${batch.upc}`) || now - batch.observed_at > this.config.monitor.staleAfterMs ||
+        const hours = this.hours(batch.store_id);
+        const minutes = hours && batch.schedule_json && sameSchedule(JSON.parse(batch.schedule_json), hours.schedule)
+          ? openMinutes(hours.schedule, batch.observed_at, now) : null;
+        const stale = !covered.has(`${batch.store_id}:${batch.upc}`) || now - batch.observed_at > this.config.monitor.staleAfterMs;
+        if (!active.has(`${batch.store_id}:${batch.upc}`) || stale && (minutes === null || minutes > this.config.monitor.staleAfterMs / 60_000) ||
             now - batch.started_at > 7 * DAY || !this.config.monitor.enabled) {
           this.db.prepare("UPDATE restock_batches SET state='uncertain',reason='monitoring_gap',ended_at=? WHERE id=?").run(now, batch.id);
           continue;
         }
+        if (stale) continue; // Closed hours preserve the sample, not live alerts.
         if (batch.reason) continue;
-        const hours = this.hours(batch.store_id);
         if (!hours || !sameSchedule(JSON.parse(batch.schedule_json), hours.schedule)) {
           this.db.prepare("UPDATE restock_batches SET reason=? WHERE id=?").run(hours ? 'hours_changed' : 'hours_unavailable', batch.id);
           continue;

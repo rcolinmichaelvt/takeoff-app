@@ -1,6 +1,8 @@
-# Takeoff product ideas — proposals awaiting approval
+# Takeoff product ideas and approved calendar scope
 
-These ideas are not implemented or added to the agreed milestones. The current patch contains only the four requested fixes. Keep the free local build while validating the experience; choose the next feature before implementation.
+You approved calendar events first. Takeoff 0.4.2 now includes moderator events with images, private events, weekly repeats and a collapsed layer for existing DG batch forecasts, with favorites/all-nearby options. Community stock reporting remains deferred. The broader ideas below remain proposals unless explicitly listed in this approved scope. See [the calendar upgrade guide](CALENDAR_UPGRADE.md).
+
+For future community reports, your decision is: text-only reports are unverified; photo evidence must be captured directly in the app and show the product. Do not allow photo-library uploads for community reports. This rule is separate from moderator calendar images, which can be loaded from Photos. The actual community publishing and verification workflow still needs implementation and review before launch.
 
 The most useful product question is: “Where should I go, what evidence says it is worth the drive, and what should I know before arriving?” Each addition should improve that decision. A large general chat feed would make it harder to find an actionable report.
 
@@ -88,7 +90,7 @@ Keep announcements separate from urgent availability, but link an announcement t
 
 ## A practical development order
 
-First validate the four fixes on your phone. Then, if approved, build the calendar with moderator and private events plus explicit recurrence rules; leave automatic predictions in a collapsed experimental layer until the model has independent episodes. Next pilot structured reports at a small set of local stores, with moderation and source labels from the start. Add other retailers through this shared store/report model before promising broad automated monitoring.
+Validate the 0.4.2 calendar on your phone. Existing fresh-batch DG forecasts are available in its collapsed layer; calendar predictions of future truck weekdays remain proposed until the model has independent delivery episodes. Next pilot structured reports at a small set of local stores, with moderation and source labels from the start. Add other retailers through this shared store/report model before promising broad automated monitoring.
 
 After the calendar and reports prove useful, connect them to want lists and routes. Buy Apple membership when you are ready to test real remote alerts and distribute the beta. Paid membership does not itself implement notifications, account entitlements, App Attest or moderation.
 
@@ -96,9 +98,9 @@ The most useful pilot measures are how often a fresh report leads to a successfu
 
 ## Decisions before implementation
 
-1. Calendar or community reports first? Recommendation: a small calendar first, unless reports from other retailers are your main immediate need.
-2. Should new members' reports publish immediately with an Unverified label, or wait for a moderator? Recommendation: start with invited trusted reporters, then widen access once rate limits and reporting tools are tested.
-3. Should automatic calendar suggestions show only favorite stores or all stores in the saved area? Recommendation: favorite stores, collapsed, with an explicit option to expand.
+1. **Decided: calendar first.** Community reports are not in the 0.4.2 update.
+2. **Decided: unverified without an in-app product photo; no library uploads for reports.** Report submission, evidence badges and abuse controls remain deferred.
+3. **Decided: offer both favorites and all nearby stores.** Favorites is the default for the 0.4.2 forecast section.
 4. Can members submit product/store suggestions, or should moderators exclusively maintain the catalogs? Recommendation: submissions enter a private review queue.
 5. For the initial pilot, should community reports be visible only near the saved ZIP, or across all supported areas? This is separate from the DG polling rule; reading a report must not start extra monitoring.
 

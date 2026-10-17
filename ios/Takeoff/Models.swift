@@ -34,7 +34,7 @@ struct SessionTokens: Codable {
 struct LoginStart: Decodable { let authorizationUrl: URL; let state: String; let keyId: String; let expiresIn: Int }
 struct LoginHandoff { let loginCode: String; let verifier: String }
 struct Member: Decodable {
-    struct Capabilities: Decodable { let monitoring: Bool; let remotePush: Bool; let appAttestRequired: Bool; var trips: Bool? = nil }
+    struct Capabilities: Decodable { let monitoring: Bool; let remotePush: Bool; let appAttestRequired: Bool; var trips: Bool? = nil; var calendar: Bool? = nil }
     let discordId: String
     let displayName: String
     let role: String
@@ -153,6 +153,44 @@ struct InboxEvent: Decodable, Identifiable {
     var title: String { payload.title ?? kind.replacingOccurrences(of: "_", with: " ").capitalized }
 }
 struct InboxPage: Decodable { let events: [InboxEvent]; let nextCursor: Int? }
+
+struct CalendarOptions: Codable, Equatable {
+    var showModerator = true
+    var showPrivate = true
+    var showPredictions = true
+    var favoritesOnly = true
+}
+struct CalendarEntry: Decodable, Identifiable {
+    let id: String; let occurrenceId: String; let source: String
+    let title: String; let description: String; let retailer: String; let location: String; let zip: String?
+    let startsAt: Date; let endsAt: Date; let seriesStartsAt: Date; let seriesEndsAt: Date
+    let timezone: String; let recurrence: String; let repeatUntil: Date?
+    let version: Int; let canEdit: Bool; let hasImage: Bool; let updatedAt: Date
+    var isShared: Bool { source == "moderator" }
+    var sourceTitle: String { isShared ? "Moderator event" : "Only you" }
+    func overlaps(_ day: Date, calendar: Calendar = .current) -> Bool {
+        let start = calendar.startOfDay(for: day)
+        guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return false }
+        return startsAt < end && endsAt > start
+    }
+}
+struct CalendarPrediction: Decodable, Identifiable {
+    let id: String; let storeId: String; let address: String; let expectedAt: Date
+    let confidence: String; let titles: [String]
+}
+struct CalendarPage: Decodable {
+    let events: [CalendarEntry]; let predictions: [CalendarPrediction]
+    let nextCursor: String?; let preferences: CalendarOptions; let serverTime: Date
+}
+struct CalendarImage: Decodable { let base64: String; let width: Int; let height: Int }
+struct CalendarDelete: Encodable { let version: Int }
+struct CalendarWrite: Encodable {
+    let version: Int; let visibility: String; let title: String; let description: String
+    let retailer: String; let location: String; let zip: String?
+    let startsAt: Date; let endsAt: Date; let timezone: String; let recurrence: String; let repeatUntil: Date?
+    var imageBase64: String? = nil
+    var removeImage = false
+}
 
 struct RestockForecast: Decodable {
     let batchId: Int; let startedAt: Date; let pendingQuantity: Int; let expectedAt: Date?

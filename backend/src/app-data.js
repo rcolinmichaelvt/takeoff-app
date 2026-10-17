@@ -3,7 +3,8 @@ import { transaction } from './database.js';
 import { milesBetween } from './geography.js';
 import { Intelligence, TRAVEL_REFRESH_AGE } from './intelligence.js';
 import { Trips } from './trips.js';
-import { inventoryStatus, restoreRecentDecreaseSignals } from './inventory.js';
+import { CalendarEvents } from './calendar.js';
+import { inventoryStatus, restoreRecentDecreaseSignals, restoreUnchangedBackStock } from './inventory.js';
 
 export const defaultAlerts = Object.freeze({ firstDecrease: true, soldOut: true, approaching: true,
   stockIncrease: false, anyDecrease: false, tripChanges: true, paused: false });
@@ -14,8 +15,10 @@ export class AppData {
     Object.assign(this, { db, config, catalog, geography, clock });
     this.products = new Map(catalog.map(p => [p.upc, p]));
     restoreRecentDecreaseSignals(db, clock());
+    restoreUnchangedBackStock(db);
     this.intelligence = new Intelligence({ db, config, clock });
     this.trips = new Trips(this);
+    this.calendar = new CalendarEvents(this);
   }
 
   settings(discordId) {
@@ -162,6 +165,7 @@ export class AppData {
       Number.isInteger(Number(limit)) && Number(limit) > 0 && Number(limit) <= 100,
     400, 'INVALID_INPUT', 'Invalid history cursor.');
     const rows = this.db.prepare(`SELECT * FROM inventory_history WHERE store_id=? AND created_at>? AND id<?
+      AND NOT (kind='resumed' AND previous_quantity=quantity)
       ORDER BY id DESC LIMIT ?`).all(id, this.clock() - this.config.historyTtlMs, Number(before), Number(limit) + 1);
     const items = rows.slice(0, Number(limit)).map(row => ({ id: row.id, upc: row.upc,
       title: this.products.get(row.upc)?.title || row.upc, previousQuantity: row.previous_quantity, quantity: row.quantity,

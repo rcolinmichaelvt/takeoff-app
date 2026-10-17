@@ -2,11 +2,11 @@
 
 Takeoff includes a real SwiftUI project at `ios/Takeoff.xcodeproj`. Open that project directly. The app targets **iPhone, iOS 17.0 or later**, uses Swift 5 language mode, and has no external Swift packages. Your reported iPhone on iOS 26.2 meets the deployment target. Xcode still needs the appropriate device support installed locally.
 
-The source and project structure were checked in a Linux workspace. **An Xcode build and on-device run have not been performed here.** The included 11 XCTest cases are ready to run on your Mac.
+The source and project structure were checked in a Linux workspace. **An Xcode build and on-device run have not been performed here.** The included 14 XCTest cases are ready to run on your Mac.
 
 ## 1. Upgrade your existing Railway backend first
 
-Follow [MILESTONE_4_UPGRADE.md](MILESTONE_4_UPGRADE.md) when updating the working Milestone 3 app. Keep the existing project/signing configuration; the update only changes already-included Swift files. A fresh setup also needs the settings, store, note, inventory, and travel endpoints. Keep the same service URL and persistent `/data` volume.
+Follow [CALENDAR_UPGRADE.md](CALENDAR_UPGRADE.md) when updating the working Milestone 4.1 app. Keep the existing project/signing configuration and add **CalendarView.swift** to the Takeoff app target as described there. A fresh setup also needs the settings, store, note, inventory, and travel endpoints. Keep the same service URL and persistent `/data` volume.
 
 You can test Discord sign-in and save a ZIP before enabling DG monitoring. An empty map is expected until the worker has valid DG credentials and at least one member has saved a ZIP and selected products.
 
@@ -17,11 +17,11 @@ Confirm these existing Railway values:
 | `PUBLIC_BASE_URL` | Your API's HTTPS origin, such as `https://takeoff-api-example.up.railway.app` |
 | `APP_CALLBACK_URL` | `takeoff://auth/callback` |
 | `ALLOWED_DISCORD_IDS` | Your numeric Discord user ID |
-| `MODERATOR_DISCORD_IDS` | Your ID too, if you want to test public notes |
+| `MODERATOR_DISCORD_IDS` | Your ID too, for public notes and shared calendar posts |
 
 In the Discord Developer Portal, the registered OAuth redirect is **your Railway URL plus `/v1/auth/discord/callback`**. The `takeoff://` URL is the second hop, from your backend into the app; it is already registered in the project's Info.plist.
 
-For an incremental update, merge the ZIP into the existing repository first. The ZIP is not a standalone Xcode project. All changed Swift types are in existing target members; keep your current project, signing Team and bundle ID.
+For an incremental update, merge the ZIP into the existing repository first. The ZIP is not a standalone Xcode project. Keep your current project, signing Team and bundle ID. This update adds one new source file: **CalendarView.swift**. Use File → Add Files to “Takeoff”… and ensure Takeoff target membership, unless your project added it automatically.
 
 ## 2. Open the project
 
@@ -68,7 +68,8 @@ Official references: [running on a device](https://developer.apple.com/documenta
 3. Select your products from the curated catalog and tap **Start exploring**. Selecting no products creates no monitoring work for your account.
 4. Open **Discover**. Use the list/map toggle, item filter, and **Your area / All covered areas** control. The app refreshes approximately every 30 seconds while active; you can refresh manually.
 5. Tap a store. Check product quantities and last increase/decrease times, favorite/exclude it, and save a private note. Moderators can separately save a public note. Drive estimates are requested from your saved ZIP's center, on demand and gradually during foreground refresh. They can be unavailable. Store details also show opening-hours timing, confidence, and forecasts as clean samples accumulate.
-6. Open **Inbox** for changes selected by your alert preferences from the last seven days. In **Settings → Alerts & pause**, choose event types or pause notifications. Paused events remain in the inbox.
+6. Open **Calendar** for moderator/private events. The **+** editor supports shared images for moderators and private weekly reminders/events. These are calendar entries only; reminder notification delivery is deferred. The calendar filter controls the optional DG prediction section. **Favorites** are now accessed through the star button in Discover.
+7. Open **Inbox** for changes selected by your alert preferences from the last seven days. In **Settings → Alerts & pause**, choose event types or pause notifications. Paused events remain in the inbox. **Clear all notifications** removes your existing inbox after confirmation, retaining stock history and future alerts.
 
 A green pin means at least one filtered product is likely for sale; yellow means back stock when no filtered product is green; gray means uncertain data when neither green nor yellow applies; red means all observed filtered products are sold out. The store detail shows each observed product separately. Initial positive observations are gray until a decrease with units remaining. Green expires seven days after the latest decrease, and unchanged polls do not extend it. Observations older than nine minutes, or without an active subscription covering them, also show unknown.
 
@@ -76,7 +77,7 @@ The server uses DG coordinates if supplied. Otherwise it resolves public store a
 
 ## 6. Run the included iOS checks
 
-Choose an installed **iPhone simulator** as the destination, keep the **Takeoff** scheme selected, then press **Command-U**. The 11 tests cover:
+Choose an installed **iPhone simulator** as the destination, keep the **Takeoff** scheme selected, then press **Command-U**. The 14 tests cover:
 
 - Exact request-signing bytes and verification of a Node-generated P-256 DER signature.
 - Callback origin/state validation and rejection of duplicate login codes.
@@ -89,6 +90,9 @@ Choose an installed **iPhone simulator** as the destination, keep the **Takeoff*
 - Seven-day availability expiry while observation timestamps are still fresh.
 - Older alert preferences retaining choices while defaulting Trip changes on.
 - Preview requests omitting unmeasured legs and owner fields.
+- Calendar occurrences retaining series dates and exclusive end-day behavior.
+- Private calendar writes omitting image and account identifiers.
+- Older server capabilities keeping Calendar disabled until the backend is upgraded.
 
 These tests do not sign in or contact Railway. A simulator is a **different installation** if you later sign into it. Moving the same Discord account between your phone and a simulator invokes the six-hour transfer rule. The simulator uses a development-only software signing key; physical phones use Secure Enclave. For normal development, test the UI signed in on one installation at a time.
 
@@ -114,11 +118,12 @@ Sources: [Apple developer account overview](https://developer.apple.com/help/acc
 | What you see | What to check |
 | --- | --- |
 | `node: bad option: --test` on your Mac | Terminal is still using old Node. Install Node **24.x**, reopen Terminal, run `node --version` and `which node`, then run `npm test` from `backend`. Xcode does not run Node. |
+| `Cannot find CalendarView in scope` | Add CalendarView.swift to the Takeoff app target; see the calendar upgrade guide. |
 | Signing requires a development team | Select your Personal Team on the **Takeoff target**, not only the project. Check TakeoffTests too if running tests on the phone. |
 | Bundle identifier unavailable | Choose a unique bundle identifier and let automatic signing refresh. |
 | Project opens but no files/build target appear | Open the supplied `.xcodeproj`; preserve the sibling source/test directories. Avoid dragging duplicate copies into a blank project. |
 | “Set your Railway HTTPS URL” | Replace the placeholder in `Takeoff/AppConfiguration.swift`, then build again. |
-| Server response does not match this app / endpoint missing | Deploy the Milestone 4 backend update to the API service, then retry. A healthy older API can still lack the new endpoints. |
+| Server response does not match this app / endpoint missing | Deploy the calendar/0.4.2 backend update to the API service, then retry. A healthy older API can still lack the new endpoints. |
 | Discord invalid redirect | Match the exact HTTPS callback in Discord to Railway's `PUBLIC_BASE_URL`. |
 | Discord access denied | Check the numeric user ID and the signed-in Discord account; apply the Railway allowlist change. |
 | Invalid or expired sign-in code | Restart sign-in and complete the device-transfer prompt within two minutes. |

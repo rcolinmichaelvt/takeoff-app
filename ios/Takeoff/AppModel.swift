@@ -31,6 +31,15 @@ final class AppModel: ObservableObject {
     @Published var tripCandidates: [Store] = []
     @Published var tripBusy = false
     @Published var tripProgress: String?
+    @Published var calendarEntries: [CalendarEntry] = []
+    @Published var calendarPredictions: [CalendarPrediction] = []
+    @Published var calendarOptions = CalendarOptions()
+    @Published var calendarLoading = false
+    @Published var calendarSaving = false
+    @Published var calendarError: String?
+    private var calendarGeneration = UUID()
+    private var calendarSession = UUID()
+    private var calendarWindow: DateInterval?
     private var tripVersion = 0
     private var tripGeneration = UUID()
     private var tripRequest: MKDirections?
@@ -195,6 +204,19 @@ final class AppModel: ObservableObject {
             if let index = events.firstIndex(where: { $0.id == event.id }) { events[index].readAt = Date() }
         } catch { await report(error) }
     }
+    func clearNotifications() async {
+        guard !busy, !refreshing, phase == .signedIn, let throughId = events.map(\.id).max() else { return }
+        busy = true; revision += 1
+        let account = member?.discordId
+        defer { busy = false; revision += 1 }
+        do {
+            struct Clear: Encodable { let throughId: Int }
+            let _: Acknowledgement = try await client().post("/v1/events/clear", body: Clear(throughId: throughId))
+            guard phase == .signedIn, member?.discordId == account else { return }
+            events.removeAll { $0.id <= throughId }; eventCursor = nil
+            await refresh()
+        } catch { await report(error) }
+    }
     func refreshDriveEstimate() async {
         guard phase == .signedIn, member?.capabilities.monitoring == true, preferences.alerts.approaching,
               !refreshingDrive, !tripBusy, Date() >= nextDriveRequest, UIApplication.shared.applicationState == .active else { return }
@@ -246,6 +268,9 @@ final class AppModel: ObservableObject {
         catch { await report(error) }
     }
     private func clearVisibleAccount() {
+        calendarGeneration = UUID(); calendarSession = UUID(); calendarWindow = nil
+        calendarEntries = []; calendarPredictions = []; calendarOptions = .init()
+        calendarLoading = false; calendarSaving = false; calendarError = nil
         cancelDriveEstimate(); driveRetryAfter = [:]; nextDriveRequest = .distantPast
         cancelTripPlanning(); trip = nil; tripDraft = nil; tripCandidates = []; tripVersion = 0
         revision += 1
@@ -262,6 +287,94 @@ final class AppModel: ObservableObject {
         } else { explanation = error.localizedDescription }
         if quiet && phase == .signedIn { connectionWarning = explanation }
         else { message = explanation }
+    }
+}
+
+extension AppModel {
+    func loadCalendar(from: Date, to: Date) async {
+        guard phase == .signedIn, !calendarSaving, member?.capabilities.calendar == true else { return }
+        let generation = UUID(); calendarGeneration = generation
+        let session = calendarSession
+        let window = DateInterval(start: from, end: to)
+        if calendarWindow != window { calendarEntries = []; calendarPredictions = [] }
+        calendarWindow = window; calendarLoading = true
+        defer { if calendarGeneration == generation { calendarLoading = false } }
+        do {
+            let query = "from=\(Int64(from.timeIntervalSince1970 * 1000))&to=\(Int64(to.timeIntervalSince1970 * 1000))"
+            let api = try client()
+            var page: CalendarPage = try await api.get("/v1/calendar?\(query)")
+            var entries = page.events
+            let predictions = page.predictions, options = page.preferences
+            var cursors = Set<String>()
+            while let cursor = page.nextCursor {
+                try Task.checkCancellation()
+                guard calendarGeneration == generation, calendarSession == session, phase == .signedIn else { return }
+                guard cursors.insert(cursor).inserted else { throw ClientError.message("Calendar could not finish loading. Pull to refresh.") }
+                page = try await api.get("/v1/calendar?\(query)&after=\(cursor)")
+                entries += page.events
+            }
+            try Task.checkCancellation()
+            guard calendarGeneration == generation, calendarSession == session, phase == .signedIn else { return }
+            var seen = Set<String>()
+            calendarEntries = entries.filter { seen.insert($0.occurrenceId).inserted }
+            calendarPredictions = predictions; calendarOptions = options; calendarError = nil
+        } catch {
+            if calendarGeneration == generation, calendarSession == session, !(error is CancellationError) {
+                calendarError = error.localizedDescription
+                if let error = error as? APIError, error.endsSession { await report(error) }
+            }
+        }
+    }
+    private func reloadCalendar() async {
+        if let window = calendarWindow { await loadCalendar(from: window.start, to: window.end) }
+    }
+    func calendarImage(for event: CalendarEntry) async throws -> Data {
+        let session = calendarSession
+        let result: CalendarImage = try await client().get("/v1/calendar/\(event.id)/image")
+        guard phase == .signedIn, calendarSession == session else { throw CancellationError() }
+        guard let data = Data(base64Encoded: result.base64) else { throw ClientError.message("This image could not be loaded.") }
+        return data
+    }
+    func saveCalendar(id: String?, input: CalendarWrite) async -> Bool {
+        guard phase == .signedIn, !calendarSaving else { return false }
+        calendarSaving = true; calendarGeneration = UUID(); calendarLoading = false
+        let session = calendarSession
+        defer { if calendarSession == session { calendarSaving = false } }
+        do {
+            let api = try client()
+            if let id { let _: CalendarEntry = try await api.put("/v1/calendar/\(id)", body: input) }
+            else { let _: CalendarEntry = try await api.post("/v1/calendar", body: input) }
+            guard phase == .signedIn, calendarSession == session else { return false }
+            calendarSaving = false; await reloadCalendar(); return true
+        } catch {
+            if calendarSession == session { await report(error) }; return false
+        }
+    }
+    func deleteCalendar(_ event: CalendarEntry) async -> Bool {
+        guard phase == .signedIn, !calendarSaving else { return false }
+        calendarSaving = true; calendarGeneration = UUID(); calendarLoading = false
+        let session = calendarSession
+        defer { if calendarSession == session { calendarSaving = false } }
+        do {
+            let _: Acknowledgement = try await client().post("/v1/calendar/\(event.id)/delete", body: CalendarDelete(version: event.version))
+            guard phase == .signedIn, calendarSession == session else { return false }
+            calendarEntries.removeAll { $0.id == event.id }
+            calendarSaving = false; await reloadCalendar(); return true
+        } catch { if calendarSession == session { await report(error) }; return false }
+    }
+    func saveCalendarOptions(_ options: CalendarOptions) async -> Bool {
+        guard phase == .signedIn, !calendarSaving else { return false }
+        calendarSaving = true; calendarGeneration = UUID(); calendarLoading = false
+        let session = calendarSession
+        defer { if calendarSession == session { calendarSaving = false } }
+        do {
+            let saved: CalendarOptions = try await client().put("/v1/calendar/preferences", body: options)
+            guard phase == .signedIn, calendarSession == session else { return false }
+            calendarOptions = saved
+            calendarEntries.removeAll { $0.isShared ? !saved.showModerator : !saved.showPrivate }
+            calendarPredictions = []
+            calendarSaving = false; await reloadCalendar(); return true
+        } catch { if calendarSession == session { await report(error) }; return false }
     }
 }
 

@@ -27,6 +27,21 @@ export function restoreRecentDecreaseSignals(db, now) {
     .run(now - AVAILABILITY_TTL_MS, now);
 }
 
+// Repair the old unchanged-gap reset only when retained history shows the same
+// quantity continuously since a known back-stock state. Never restore a sample.
+export function restoreUnchangedBackStock(db) {
+  db.prepare(`UPDATE inventory SET status='back',pending_quantity=quantity
+    WHERE status='unknown' AND quantity>0 AND EXISTS (
+      SELECT 1 FROM inventory_history h WHERE h.store_id=inventory.store_id AND h.upc=inventory.upc
+      AND h.status='back' AND h.quantity=inventory.quantity AND h.kind<>'resumed'
+      AND h.id=(SELECT MAX(latest.id) FROM inventory_history latest
+        WHERE latest.store_id=h.store_id AND latest.upc=h.upc AND latest.kind<>'resumed')
+      AND EXISTS (SELECT 1 FROM inventory_history gap WHERE gap.store_id=h.store_id AND gap.upc=h.upc
+        AND gap.id>h.id AND gap.kind='resumed')
+      AND NOT EXISTS (SELECT 1 FROM inventory_history gap WHERE gap.store_id=h.store_id AND gap.upc=h.upc
+        AND gap.id>h.id AND (gap.previous_quantity<>gap.quantity OR gap.quantity<>h.quantity)))`).run();
+}
+
 // Shelf inference remains independent of predicted timing: no timed green pins.
 export function observeInventory(previous, quantity, now, maximumGap = 9 * 60_000) {
   const fresh = previous && now >= previous.observed_at && now - previous.observed_at <= maximumGap;
@@ -34,6 +49,11 @@ export function observeInventory(previous, quantity, now, maximumGap = 9 * 60_00
     lastIncrease: previous?.last_increase_at ?? null, lastDecrease: previous?.last_decrease_at ?? null,
     kind: previous ? 'resumed' : 'baseline', event: null };
   if (!fresh) {
+    if (previous && now >= previous.observed_at && quantity === previous.quantity) {
+      next.status = inventoryStatus(previous, now);
+      next.pending = previous.pending_quantity;
+      return next;
+    }
     // A lower live quantity is still a sale signal after a gap; 'resumed'
     // invalidates batch timing so this cannot train a fabricated arrival time.
     if (previous && quantity > 0 && quantity < previous.quantity) {
@@ -110,7 +130,7 @@ export class Inventory {
           pending_quantity=excluded.pending_quantity,observed_at=excluded.observed_at,
           last_increase_at=excluded.last_increase_at,last_decrease_at=excluded.last_decrease_at`)
           .run(store.id, job.upc, store.quantity, next.status, next.pending, now, next.lastIncrease, next.lastDecrease);
-        if (next.kind && (next.kind !== 'resumed' || previous.quantity !== store.quantity || previous.status !== next.status)) {
+        if (next.kind && (next.kind !== 'resumed' || previous.quantity !== store.quantity)) {
           this.db.prepare(`INSERT INTO inventory_history (store_id,upc,previous_quantity,quantity,status,kind,created_at)
             VALUES (?,?,?,?,?,?,?)`).run(store.id, job.upc, previous?.quantity ?? null, store.quantity, next.status, next.kind, now);
         }

@@ -3,6 +3,7 @@ import MapKit
 
 struct FavoritesView: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.dismiss) private var dismiss
     @State private var selected: StoreDestination?
     var body: some View {
         NavigationStack {
@@ -17,6 +18,7 @@ struct FavoritesView: View {
                     Button("Load more favorites") { Task { await model.loadMoreStores(favoritesOnly: true) } }.disabled(model.busy || model.refreshing)
                 }
             }.navigationTitle("Favorites").refreshable { await model.refresh() }
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
                 .sheet(item: $selected) { value in NavigationStack { StoreDetailView(storeID: value.id) }.environmentObject(model) }
         }
     }

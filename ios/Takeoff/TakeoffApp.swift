@@ -22,7 +22,7 @@ struct RootView: View {
                 } else {
                     TabView {
                         DiscoverView().tabItem { Label("Discover", systemImage: "map.fill") }
-                        FavoritesView().tabItem { Label("Favorites", systemImage: "star.fill") }
+                        CalendarView().tabItem { Label("Calendar", systemImage: "calendar") }
                         TripsView().tabItem { Label("Trips", systemImage: "point.topleft.down.to.point.bottomright.curvepath") }
                         InboxView().tabItem { Label("Inbox", systemImage: "tray.fill") }
                             .badge(model.events.filter { $0.readAt == nil }.count)

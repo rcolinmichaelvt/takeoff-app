@@ -8,6 +8,7 @@ import { loadCatalog } from './catalog.js';
 import { createGeography } from './geography.js';
 import { AppData } from './app-data.js';
 import { eventPayload } from './event-display.js';
+import { CALENDAR_BODY_LIMIT } from './calendar.js';
 
 const BODY_LIMIT = 16 * 1024;
 
@@ -23,15 +24,15 @@ export function clientIp(req, proxyHops) {
   return candidate && isIP(candidate) ? candidate : direct;
 }
 
-async function readBody(req) {
+async function readBody(req, limit = BODY_LIMIT) {
   requireCondition(!req.headers['content-encoding'], 415, 'UNSUPPORTED_ENCODING', 'Compressed request bodies are not accepted.');
   const length = Number(req.headers['content-length'] || 0);
-  requireCondition(Number.isFinite(length) && length <= BODY_LIMIT, 413, 'BODY_TOO_LARGE', 'Request body is too large.');
+  requireCondition(Number.isFinite(length) && length <= limit, 413, 'BODY_TOO_LARGE', 'Request body is too large.');
   const chunks = [];
   let size = 0;
   for await (const chunk of req) {
     size += chunk.length;
-    requireCondition(size <= BODY_LIMIT, 413, 'BODY_TOO_LARGE', 'Request body is too large.');
+    requireCondition(size <= limit, 413, 'BODY_TOO_LARGE', 'Request body is too large.');
     chunks.push(chunk);
   }
   const raw = Buffer.concat(chunks);
@@ -85,7 +86,9 @@ export function createServer({ config, db, discord, clock = Date.now, logger = c
         res.writeHead(303, { Location: location });
         return res.end();
       }
-      const { raw, data } = await readBody(req);
+      const calendarWrite = method === 'POST' && route === '/v1/calendar' || method === 'PUT' && /^\/v1\/calendar\/[a-f0-9-]{36}$/.test(route);
+      if (calendarWrite) requireCondition(/^Bearer [A-Za-z0-9_-]{43}$/.test(req.headers.authorization || ''), 401, 'AUTH_REQUIRED', 'Sign in first.');
+      const { raw, data } = await readBody(req, calendarWrite ? CALENDAR_BODY_LIMIT : BODY_LIMIT);
       requireCondition(!['GET', 'HEAD'].includes(method) || raw.length === 0, 400, 'INVALID_BODY', 'GET requests must not have a body.');
       const request = { method, target: req.url, body: raw, proof: {
         timestamp: req.headers['x-takeoff-timestamp'], nonce: req.headers['x-takeoff-nonce'],
@@ -112,7 +115,7 @@ export function createServer({ config, db, discord, clock = Date.now, logger = c
         return send(res, 200, { discordId: session.discord_id, displayName: session.display_name,
           role: config.moderatorIds.has(session.discord_id) ? 'moderator' : 'member',
           deviceName: session.device_name, nextDeviceTransferAt: new Date(session.next_transfer_at).toISOString(),
-          capabilities: { monitoring: config.monitor.enabled, inventory: true, predictions: true, trips: true, remotePush: false, appAttestRequired: false },
+          capabilities: { monitoring: config.monitor.enabled, inventory: true, predictions: true, trips: true, calendar: true, remotePush: false, appAttestRequired: false },
         });
       }
       if (method === 'GET' && route === '/v1/catalog') return send(res, 200, { products: catalog });
@@ -123,6 +126,27 @@ export function createServer({ config, db, discord, clock = Date.now, logger = c
         return send(res, 200, result);
       }
       if (method === 'GET' && route === '/v1/monitor/status') return send(res, 200, appData.monitoringStatus());
+      if (method === 'GET' && route === '/v1/calendar') return send(res, 200, appData.calendar.list(session.discord_id, Object.fromEntries(url.searchParams)));
+      if (method === 'PUT' && route === '/v1/calendar/preferences') {
+        limiter.take(`calendar:${session.discord_id}`, 20, 60_000);
+        return send(res, 200, appData.calendar.saveOptions(session.discord_id, data));
+      }
+      const calendarRoute = route.match(/^\/v1\/calendar\/([a-f0-9-]{36})(?:\/(image|delete))?$/);
+      if (method === 'POST' && route === '/v1/calendar' || method === 'PUT' && calendarRoute && !calendarRoute[2]) {
+        limiter.take(`calendar:${session.discord_id}`, 20, 60_000);
+        if (data.imageBase64 !== undefined) limiter.take(`calendar-image:${session.discord_id}`, 6, 60_000);
+        const event = await appData.calendar.save(session.discord_id, calendarRoute?.[1], data, () => auth.assertActive(session));
+        return send(res, 200, event);
+      }
+      if (calendarRoute) {
+        const [, id, action] = calendarRoute;
+        if (method === 'GET' && !action) return send(res, 200, appData.calendar.get(session.discord_id, id));
+        if (method === 'GET' && action === 'image') return send(res, 200, appData.calendar.image(session.discord_id, id));
+        if (method === 'POST' && action === 'delete') {
+          limiter.take(`calendar:${session.discord_id}`, 20, 60_000);
+          return send(res, 200, appData.calendar.remove(session.discord_id, id, data));
+        }
+      }
       if (method === 'GET' && route === '/v1/trip') return send(res, 200, appData.trips.get(session.discord_id));
       if (method === 'POST' && route === '/v1/trip/preview') {
         limiter.take(`trip:${session.discord_id}`, 20, 60_000);
@@ -180,6 +204,13 @@ export function createServer({ config, db, discord, clock = Date.now, logger = c
           payload: eventPayload(db, row), createdAt: new Date(row.created_at).toISOString(),
           readAt: row.read_at === null ? null : new Date(row.read_at).toISOString() })),
         nextCursor: more ? selected.at(-1).id : null });
+      }
+      if (method === 'POST' && route === '/v1/events/clear') {
+        requireCondition(Object.keys(data).length === 1 && Number.isSafeInteger(data.throughId) && data.throughId > 0,
+          400, 'INVALID_INPUT', 'Refresh your inbox before clearing notifications.');
+        limiter.take(`clear-inbox:${session.discord_id}`, 10, 60_000);
+        const result = db.prepare('DELETE FROM events WHERE discord_id=? AND id<=?').run(session.discord_id, data.throughId);
+        return send(res, 200, { cleared: result.changes });
       }
       const readMatch = route.match(/^\/v1\/events\/([1-9]\d*)\/read$/);
       if (method === 'POST' && readMatch) {

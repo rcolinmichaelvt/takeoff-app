@@ -3,6 +3,7 @@ import SwiftUI
 struct InboxView: View {
     @EnvironmentObject private var model: AppModel
     @State private var selected: StoreDestination?
+    @State private var showClear = false
     var body: some View {
         NavigationStack {
             List {
@@ -36,6 +37,15 @@ struct InboxView: View {
                     if model.eventCursor != nil { Button("Load older alerts") { Task { await model.loadMoreEvents() } }.disabled(model.busy || model.refreshing) }
                 } footer: { Text("Seven-day inbox. Phone push notifications are not connected in this build.") }
             }.navigationTitle("Inbox").refreshable { await model.refresh() }
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Clear all notifications", role: .destructive) { showClear = true }
+                            .disabled(model.events.isEmpty || model.busy || model.refreshing)
+                    }
+                }
+                .confirmationDialog("Clear all existing inbox notifications?", isPresented: $showClear, titleVisibility: .visible) {
+                    Button("Clear all notifications", role: .destructive) { Task { await model.clearNotifications() } }
+                } message: { Text("This removes your existing inbox alerts. New alerts will continue to arrive.") }
                 .sheet(item: $selected) { value in NavigationStack { StoreDetailView(storeID: value.id) }.environmentObject(model) }
         }
     }

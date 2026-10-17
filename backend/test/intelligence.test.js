@@ -183,3 +183,32 @@ test('legacy and new inbox events display addresses instead of store numbers', a
   const payload = eventPayload(f.db, legacy);
   assert.equal(payload.body, '12 → 11.'); assert.match(payload.address, /100 Test Street/);
 });
+
+test('overnight unchanged checks preserve yellow stock and clean timing excludes closed hours', async t => {
+  const f = await setup(t);
+  f.advance(Date.parse('2026-10-12T21:58:00-04:00') - f.clock());
+  f.observe(0); f.observe(2, 1);
+  assert.equal(f.appData.store(ALICE, '100').inventory[0].status, 'back');
+  const events = f.db.prepare('SELECT COUNT(*) n FROM events').get().n;
+  f.advance(Date.parse('2026-10-13T01:20:00-04:00') - f.clock());
+  f.appData.intelligence.sweep(f.appData);
+  assert.equal(f.db.prepare("SELECT COUNT(*) n FROM restock_batches WHERE state='pending'").get().n, 1);
+  assert.equal(f.appData.store(ALICE, '100').inventory[0].status, 'unknown'); // no fresh response yet
+  f.observe(2);
+  assert.equal(f.appData.store(ALICE, '100').inventory[0].status, 'back');
+  assert.equal(f.appData.history('100').history.some(e => e.kind === 'resumed' && e.previousQuantity === e.quantity), false);
+  assert.equal(f.db.prepare('SELECT COUNT(*) n FROM events').get().n, events);
+  f.advance(Date.parse('2026-10-13T08:00:00-04:00') - f.clock()); f.observe(2);
+  f.observe(1, 2);
+  assert.equal(f.appData.intelligence.timing('100').sampleCount, 1);
+  assert.equal(f.appData.intelligence.timing('100').averageOpenMinutes, 3); // 1 before closing + 2 after opening
+  assert.equal(f.appData.store(ALICE, '100').inventory[0].status, 'available');
+});
+
+test('a real open-hours gap preserves the unchanged shelf inference but invalidates its timing sample', async t => {
+  const f = await setup(t); f.observe(2); f.advance(10 * 60_000);
+  f.appData.intelligence.sweep(f.appData); f.observe(2); f.observe(1, 1);
+  assert.equal(f.appData.intelligence.timing('100').sampleCount, 0);
+  assert.equal(f.db.prepare('SELECT reason FROM restock_batches').get().reason, 'monitoring_gap');
+  assert.equal(f.appData.store(ALICE, '100').inventory[0].status, 'available');
+});
